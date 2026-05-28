@@ -12,6 +12,11 @@ const doctorSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    expertiseTags: [
+      {
+        type: String, // e.g., ["headache", "migraine", "fever", "pediatrics"] for AI matching
+      }
+    ],
     experience: {
       type: Number,
       required: true,
@@ -27,6 +32,11 @@ const doctorSchema = new mongoose.Schema(
         startTime: String, // "09:00"
         endTime: String, // "17:00"
       },
+    ],
+    blockedDates: [
+      {
+        type: String, // Specific dates the doctor is unavailable (holidays, leaves)
+      }
     ],
     patients: [
       {

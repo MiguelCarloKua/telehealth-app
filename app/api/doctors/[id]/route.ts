@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
+import '@/lib/models/User'; // Ensure base schema is registered
 import { Doctor } from '@/lib/models/Doctor';
-import { Appointment } from '@/lib/models/Appointment';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // FIX: Next.js 15 Promise params
 ) {
   try {
     await connectDB();
+    const { id } = await params;
 
-    const doctor = await Doctor.findById(params.id).select(
-      'name specialty experience bio availableSlots profileImage licenseNumber'
+    // FIX: Replaced 'name' with 'firstname lastname' and added 'blockedDates'
+    const doctor = await Doctor.findById(id).select(
+      'firstname lastname specialty experience bio availableSlots blockedDates profileImage licenseNumber'
     );
 
     if (!doctor) {

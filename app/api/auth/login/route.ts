@@ -24,19 +24,20 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-
+    
     const response = NextResponse.json(
-        {
-            user: {
-            _id: user._id, 
-            firstname: user.firstname, // Changed from name
-            lastname: user.lastname,   // Added
-            email: user.email,
-            role: user.role,
-            isOnboarded: user.role === 'patient' ? !!user.height : true,
-            },
-        },
-        { status: 200 }
+      {
+          user: {
+          _id: user._id, 
+          firstname: user.firstname, 
+          lastname: user.lastname,  
+          email: user.email,
+          phoneNumber: user.phoneNumber, // <-- Add this here
+          role: user.role,
+          isOnboarded: user.role === 'patient' ? !!user.height : true,
+          },
+      },
+      { status: 200 }
     );
 
     // Set authentication cookie

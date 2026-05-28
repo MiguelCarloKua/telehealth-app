@@ -10,15 +10,32 @@ export async function POST(request: NextRequest) {
     await connectDB();
 
     const body = await request.json();
-    const { email, password, firstname, lastname, role, specialization, licenseNumber, dateOfBirth, gender } = body;
+    const { 
+      email, 
+      password, 
+      firstname, 
+      lastname, 
+      role, 
+      specialization, 
+      licenseNumber, 
+      dateOfBirth, 
+      gender, 
+      phoneNumber, 
+      profileImage 
+    } = body;
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
+    // FIX: Check if user exists by Email OR Phone Number
+    const existingUser = await User.findOne({
+      $or: [{ email }, { phoneNumber }]
+    });
+
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'User already exists' },
-        { status: 400 }
-      );
+      if (existingUser.email === email.toLowerCase()) {
+        return NextResponse.json({ error: 'Email is already registered' }, { status: 400 });
+      }
+      if (existingUser.phoneNumber === phoneNumber) {
+        return NextResponse.json({ error: 'Phone number is already registered' }, { status: 400 });
+      }
     }
 
     // Hash password
@@ -32,6 +49,8 @@ export async function POST(request: NextRequest) {
         lastname,
         email,
         password: hashedPassword,
+        phoneNumber,
+        profileImage,
         role: 'doctor',
         specialty: specialization,
         licenseNumber,
@@ -43,6 +62,8 @@ export async function POST(request: NextRequest) {
         lastname,
         email,
         password: hashedPassword,
+        phoneNumber,
+        profileImage,
         role: 'patient',
         dateOfBirth,
         gender,
@@ -51,7 +72,6 @@ export async function POST(request: NextRequest) {
 
     await newUser.save();
 
-    // Return success WITHOUT setting the HttpOnly cookies
     return NextResponse.json(
       {
         message: 'User registered successfully. Please log in.',

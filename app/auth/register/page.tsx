@@ -7,14 +7,16 @@ import { useRouter } from 'next/navigation';
 export default function Register() {
   const [userType, setUserType] = useState<'patient' | 'doctor'>('patient');
   const [formData, setFormData] = useState({
-    firstname: '', // Changed from name
-    lastname: '',  // Added lastname
+    firstname: '', 
+    lastname: '',  
     email: '',
+    phoneNumber: '+639', // Initialized directly to +639
     password: '',
     dateOfBirth: '',
     gender: '',
     specialization: '',
     licenseNumber: '',
+    profileImage: '', 
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,45 +30,98 @@ export default function Register() {
     }));
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setError('');
-      setLoading(true);
+  // ENHANCED PHONE HANDLER for Philippine Mobile Numbers
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
 
-      try {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            role: userType,
-          }),
-        });
+    // 1. Strip out everything except numbers and the plus sign
+    val = val.replace(/[^\d+]/g, '');
 
-        if (!response.ok) {
-          const data = await response.json();
-          setError(data.error || 'Registration failed');
-          setLoading(false);
-          return;
-        }
+    // 2. Auto-format standard local inputs
+    if (val.startsWith('09')) {
+      val = '+63' + val.substring(1); // Converts 09... to +639...
+    } else if (val.startsWith('9')) {
+      val = '+63' + val; // Converts 9... to +639...
+    }
 
-        // 1. Alert the user
-        alert("Registration successful! Please log in to continue.");
-        
-        // 2. Redirect strictly to the login page
-        router.push('/auth/login');
-        
-      } catch (err: any) {
-        setError(err.message || 'An error occurred');
-        setLoading(false);
+    // 3. Strictly enforce the +63 prefix
+    if (!val.startsWith('+63')) {
+      val = '+639';
+    }
+
+    // 4. Cap the total length to exactly 13 characters (+63 followed by 10 digits)
+    if (val.length > 13) {
+      val = val.substring(0, 13);
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      phoneNumber: val,
+    }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError('Image size must be less than 2MB');
+        return;
       }
-    };
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({
+          ...prev,
+          profileImage: reader.result as string,
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    // STRICT VALIDATION: Must be exactly 13 characters and start with +639
+    if (formData.phoneNumber.length !== 13 || !formData.phoneNumber.startsWith('+639')) {
+      setError('Please enter a valid Philippine mobile number (e.g., +639123456789).');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          role: userType,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || 'Registration failed');
+        setLoading(false);
+        return;
+      }
+
+      alert("Registration successful! Please log in to continue.");
+      router.push('/auth/login');
+      
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
+      setLoading(false);
+    }
+  };
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-6 transition-colors">
-      <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+      <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 my-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Create your account</h1>
-        <p className="text-gray-500 dark:text-gray-400 mb-8">Join our telehealth platform to connect with top doctors.</p>
+        <p className="text-gray-500 dark:text-gray-400 mb-8">Join our telehealth platform to connect with top healthcare professionals.</p>
 
         {/* User Type Selection */}
         <div className="mb-6 flex gap-4">
@@ -101,10 +156,39 @@ export default function Register() {
             </div>
           )}
 
+          {/* Profile Picture Upload (Optional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Profile Picture <span className="text-gray-400 font-normal">(Optional)</span>
+            </label>
+            <div className="flex items-center gap-4">
+              {formData.profileImage && (
+                <img 
+                  src={formData.profileImage} 
+                  alt="Profile preview" 
+                  className="w-12 h-12 rounded-full object-cover border border-gray-200 dark:border-gray-700" 
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-500 dark:text-gray-400
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-full file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-blue-50 file:text-blue-700
+                  hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-400"
+              />
+            </div>
+          </div>
+
           {/* SPLIT NAME FIELDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                First Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 name="firstname"
@@ -115,7 +199,9 @@ export default function Register() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Last Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 name="lastname"
@@ -127,20 +213,40 @@ export default function Register() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                name="email"
+                required
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Phone Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                name="phoneNumber"
+                required
+                value={formData.phoneNumber}
+                onChange={handlePhoneChange}
+                placeholder="+639123456789"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Password <span className="text-red-500">*</span>
+            </label>
             <input
               type="password"
               name="password"
@@ -155,18 +261,23 @@ export default function Register() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date of Birth</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     name="dateOfBirth"
                     required
                     value={formData.dateOfBirth}
                     onChange={handleChange}
+                    max={new Date().toISOString().split('T')[0]} 
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gender</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Gender <span className="text-red-500">*</span>
+                  </label>
                   <select
                     name="gender"
                     required
@@ -186,7 +297,9 @@ export default function Register() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Specialization</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Specialization <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="specialization"
@@ -198,7 +311,9 @@ export default function Register() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">License Number</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    License Number <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="licenseNumber"
@@ -215,7 +330,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
             {loading ? 'Creating account...' : 'Register Account'}
           </button>

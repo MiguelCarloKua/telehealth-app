@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation'; // <-- Added useRouter
+import { usePathname, useRouter } from 'next/navigation'; 
 import { Menu, X, LayoutDashboard, Stethoscope, Calendar, FileText, Settings, LogOut, Bell, Info } from 'lucide-react';
 import { apiCall } from '@/lib/utils/api'; 
 
@@ -10,10 +10,11 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [initials, setInitials] = useState('U'); // Dynamic initials
+  const [initials, setInitials] = useState('U'); 
+  const [profileImage, setProfileImage] = useState<string | null>(null); // New state for profile picture
   
   const pathname = usePathname();
-  const router = useRouter(); // <-- Initialized router
+  const router = useRouter(); 
 
   const navLinks = [
     { name: 'Dashboard', href: '/patient/dashboard', icon: LayoutDashboard },
@@ -25,15 +26,10 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   // --- LOGOUT LOGIC ---
   const handleLogout = async () => {
     try {
-      // 1. Tell the backend to destroy the secure cookies
       await fetch('/api/auth/logout', { method: 'POST' });
-      
-      // 2. Clear frontend local storage
       localStorage.removeItem('patientId');
       localStorage.removeItem('patientName');
-      
-      // 3. Push to login page
-      router.push('/auth/login');
+      window.location.href = '/auth/login';
     } catch (error) {
       console.error('Logout failed', error);
     }
@@ -44,15 +40,11 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     const checkAuth = () => {
       const patientId = localStorage.getItem('patientId');
       if (!patientId) {
-        // Use replace instead of push so they can't hit 'forward' again
         router.replace('/auth/login'); 
       }
     };
 
-    // Check immediately on mount
     checkAuth();
-
-    // Listen for the user returning to the tab or using the Back button
     window.addEventListener('pageshow', checkAuth);
     window.addEventListener('focus', checkAuth);
 
@@ -64,6 +56,8 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   
   // --- INITIAL LOAD & POLLING LOGIC ---
   useEffect(() => {
+    const patientId = localStorage.getItem('patientId'); 
+
     // Set dynamic initials from local storage
     const storedName = localStorage.getItem('patientName');
     if (storedName) {
@@ -72,10 +66,24 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
       setInitials(init.toUpperCase());
     }
 
-    const fetchNotifications = async () => {
-      const patientId = localStorage.getItem('patientId'); 
+    // Fetch user profile to check for profile image
+    const fetchProfile = async () => {
       if (!patientId) return;
+      try {
+        const res = await fetch(`/api/users/${patientId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profileImage) {
+            setProfileImage(data.profileImage);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch user profile:", error);
+      }
+    };
 
+    const fetchNotifications = async () => {
+      if (!patientId) return;
       try {
         const data = await apiCall(`/notifications?userId=${patientId}`);
         setNotifications(data);
@@ -84,8 +92,9 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
       }
     };
 
+    fetchProfile();
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
+    const interval = setInterval(fetchNotifications, 100000);
     return () => clearInterval(interval);
   }, []);
 
@@ -169,14 +178,17 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
                 <Settings size={20} />
               </Link>
               
-              {/* --- FIX: Desktop Logout Button --- */}
               <button onClick={handleLogout} className="text-red-500 hover:text-red-700 transition-colors">
                 <LogOut size={20} />
               </button>
 
-              {/* Dynamic Initials */}
-              <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-400 font-bold border border-blue-200 dark:border-blue-700">
-                {initials}
+              {/* Dynamic Initials OR Profile Picture */}
+              <div className="h-10 w-10 rounded-full flex items-center justify-center font-bold overflow-hidden border border-blue-200 dark:border-blue-700 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400">
+                {profileImage ? (
+                  <img src={profileImage} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
               </div>
             </div>
 
@@ -209,7 +221,6 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
                   <Settings size={20} /> Settings
                 </Link>
                 
-                {/* --- FIX: Mobile Logout Button --- */}
                 <button 
                   onClick={() => { setIsMenuOpen(false); handleLogout(); }} 
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"

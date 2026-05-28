@@ -10,53 +10,23 @@ export enum AppointmentStatus {
 
 export enum AppointmentType {
   VIDEO = 'video',
-  IN_PERSON = 'in_person',
+  LIVE_CHAT = 'live_chat', // 1. Changed from in_person
 }
 
 const appointmentSchema = new mongoose.Schema(
   {
-    doctor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Doctor',
-      required: true,
-    },
-    patient: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Patient',
-      required: true,
-    },
-    scheduledDate: {
-      type: Date,
-      required: true,
-    },
-    startTime: {
-      type: String, // "10:00"
-      required: true,
-    },
-    endTime: {
-      type: String, // "10:30"
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: Object.values(AppointmentStatus),
-      default: AppointmentStatus.SCHEDULED,
-    },
-    type: {
-      type: String,
-      enum: Object.values(AppointmentType),
-      required: true,
-    },
-    reason: {
-      type: String,
-      required: true,
-    },
+    doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor', required: true },
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true },
+    scheduledDate: { type: Date, required: true },
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+    status: { type: String, enum: Object.values(AppointmentStatus), default: AppointmentStatus.SCHEDULED },
+    type: { type: String, enum: Object.values(AppointmentType), required: true },
+    reason: { type: String, required: true },
     notes: String,
-    joinURL: String, // For video appointments
+    joinURL: String, 
   },
   { timestamps: true }
 );
 
-export const Appointment =
-  mongoose.models.Appointment ||
-  mongoose.model('Appointment', appointmentSchema);
+export const Appointment = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);

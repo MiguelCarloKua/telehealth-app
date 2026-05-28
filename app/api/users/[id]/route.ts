@@ -45,10 +45,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const user = await User.findById(id);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    // 2. Choose the correct model
-    const Model = user.role === 'patient' ? Patient : User;
+    // 2. FIX: Choose the exactly correct model to ensure discriminator validation runs
+    const Model = user.role === 'patient' ? Patient : Doctor;
 
-    // 3. Handle Password (same logic as before)
+    // 3. Handle Password
     if (body.currentPassword && body.newPassword) {
       const isMatch = await bcrypt.compare(body.currentPassword, user.password);
       if (!isMatch) return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
@@ -70,6 +70,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json(updatedUser);
   } catch (error: any) {
+    // FIX: Intercept MongoDB Duplicate Key Error for Phone Numbers
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.phoneNumber) {
+      return NextResponse.json(
+        { error: 'This phone number is already registered to another account.' }, 
+        { status: 400 }
+      );
+    }
+
+    // Default error fallback
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

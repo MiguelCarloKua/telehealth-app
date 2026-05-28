@@ -24,34 +24,31 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
-        setError(data.error || 'Login failed');
+        setError(data.error || 'Invalid credentials');
         setLoading(false);
         return;
       }
 
-      const data = await response.json();
-            
-            // --- FIX: Safely stitch the first and last name together ---
-            const fullName = `${data.user.firstname} ${data.user.lastname}`;
-            
-            // Save credentials for the PatientLayout route guards and Dashboard UI
-            localStorage.setItem('patientId', data.user._id);
-            localStorage.setItem('patientName', fullName);
+      // === THE CRITICAL FIX IS HERE ===
+      // Save the credentials to local storage so the layout and settings work
+      if (data.user.role === 'doctor') {
+        localStorage.setItem('doctorId', data.user._id);
+        localStorage.setItem('doctorName', `${data.user.firstname} ${data.user.lastname}`);
+        window.location.href = '/doctor/dashboard'; // Hard navigate
+      } else if (data.user.role === 'patient') {
+        localStorage.setItem('patientId', data.user._id);
+        localStorage.setItem('patientName', `${data.user.firstname} ${data.user.lastname}`);
+        window.location.href = '/patient/dashboard'; // Hard navigate
+      }
 
-            // --- SMART ROUTING LOGIC ---
-            if (data.user.role === 'doctor') {
-              router.push('/doctor/dashboard');
-            } else {
-              const redirectPath = data.user.isOnboarded ? '/patient/dashboard' : '/patient/onboarding';
-              router.push(redirectPath);
-            }
-          } catch (err: any) {
-            setError(err.message || 'An error occurred');
-            setLoading(false);
-          }
-        };
+    } catch (err) {
+      setError('An error occurred during login.');
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-6 transition-colors">

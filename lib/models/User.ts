@@ -25,6 +25,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    phoneNumber: {
+      type: String,
+      required: true, 
+      unique: true, // <-- Added unique constraint
+    },
     role: {
       type: String,
       enum: Object.values(UserRole),

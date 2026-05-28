@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
-import { useRouter } from 'next/navigation'; // Added router for deletion redirect
-import { User, Shield, Palette, Activity, Sun, Moon, Monitor } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { User, Shield, Palette, Activity, Sun, Moon, Monitor, Camera } from 'lucide-react';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -13,13 +13,16 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   // Profile Form State
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
+  const [profileImage, setProfileImage] = useState('');
 
   // Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -40,8 +43,10 @@ export default function SettingsPage() {
           setFirstName(data.firstname || '');
           setLastName(data.lastname || '');
           setEmail(data.email || '');
+          setPhoneNumber(data.phoneNumber || '');
           setHeight(data.height?.toString() || '');
           setWeight(data.weight?.toString() || '');
+          setProfileImage(data.profileImage || '');
         }
       } catch (error) {
         console.error("Failed to load user settings:", error);
@@ -53,9 +58,27 @@ export default function SettingsPage() {
     fetchUserData();
   }, []);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError('Image size must be less than 2MB');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImage(reader.result as string);
+        setError('');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setError('');
     const patientId = localStorage.getItem('patientId');
 
     try {
@@ -63,7 +86,9 @@ export default function SettingsPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          lastname: lastName, // Only sending allowed fields
+          firstname: firstName, // Added back to payload
+          lastname: lastName,
+          profileImage,
           height: Number(height),
           weight: Number(weight),
         }),
@@ -72,9 +97,13 @@ export default function SettingsPage() {
       if (response.ok) {
         localStorage.setItem('patientName', `${firstName} ${lastName}`);
         alert('Profile updated successfully!');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to update profile');
       }
     } catch (error) {
       console.error("Failed to save:", error);
+      setError('An error occurred while saving.');
     } finally {
       setSaving(false);
     }
@@ -113,17 +142,11 @@ export default function SettingsPage() {
       
       const patientId = localStorage.getItem('patientId');
       try {
-        // 1. Delete from DB
         const response = await fetch(`/api/users/${patientId}`, { method: 'DELETE' });
         
         if (response.ok) {
-          // 2. Call the logout API to clear the server-side cookies
           await fetch('/api/auth/logout', { method: 'POST' });
-          
-          // 3. Clear frontend storage
           localStorage.clear();
-          
-          // 4. Force a hard navigation to the root (triggers full app re-mount)
           window.location.href = '/auth/register'; 
         }
       } catch (error) {
@@ -171,21 +194,49 @@ export default function SettingsPage() {
           {activeTab === 'profile' && (
              <form onSubmit={handleSaveProfile} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-6">
                <h2 className="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-4">Personal Information</h2>
+               
+               {error && <p className="text-sm text-red-500">{error}</p>}
+
+               {/* Profile Picture Upload */}
+               <div className="flex items-center gap-6 pb-4">
+                 <div className="h-20 w-20 rounded-full flex items-center justify-center font-bold overflow-hidden border border-blue-200 dark:border-blue-700 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400 text-2xl">
+                   {profileImage ? (
+                     <img src={profileImage} alt="Profile" className="h-full w-full object-cover" />
+                   ) : (
+                     firstName.charAt(0) + lastName.charAt(0)
+                   )}
+                 </div>
+                 <div>
+                   <label className="flex items-center gap-2 cursor-pointer bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-4 py-2 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">
+                     <Camera size={18} /> Change Picture
+                     <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                   </label>
+                   <p className="text-xs text-gray-500 mt-2">JPG, GIF or PNG. Max size of 2MB.</p>
+                 </div>
+               </div>
+
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div>
-                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name (Unchangeable)</label>
-                   {/* GOAL 1 FIX: Disabled Input State */}
-                   <input type="text" disabled value={firstName} className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-500 cursor-not-allowed" />
+                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+                   <input type="text" required value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500" />
                  </div>
                  <div>
                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
                    <input type="text" required value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500" />
                  </div>
-                 <div className="md:col-span-2">
+                 
+                 {/* Email & Phone Number are now both disabled / read-only displays */}
+                 <div>
                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex justify-between">
                      Email <Shield size={14} className="text-gray-400" />
                    </label>
                    <input type="email" value={email} disabled className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-500 cursor-not-allowed" />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex justify-between">
+                     Phone Number <Shield size={14} className="text-gray-400" />
+                   </label>
+                   <input type="tel" value={phoneNumber} disabled className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-500 cursor-not-allowed" />
                  </div>
                </div>
                
@@ -242,7 +293,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-                    {/* APPEARANCE TAB */}
+          {/* APPEARANCE TAB */}
           {activeTab === 'appearance' && mounted && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-4">Theme Preferences</h2>
@@ -253,36 +304,36 @@ export default function SettingsPage() {
                   onClick={() => setTheme('light')}
                   className={`flex flex-col items-center p-6 rounded-xl border-2 transition-all ${
                     theme === 'light' 
-                    ? 'border-violet-600 bg-violet-50 dark:bg-violet-900/20' 
-                    : 'border-gray-200 dark:border-gray-700 hover:border-violet-300 dark:hover:border-gray-600'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  <Sun size={32} className={`mb-3 ${theme === 'light' ? 'text-violet-600' : 'text-gray-500'}`} />
-                  <span className={`font-semibold ${theme === 'light' ? 'text-violet-700 dark:text-violet-400' : 'text-gray-700 dark:text-gray-300'}`}>Light Mode</span>
+                  <Sun size={32} className={`mb-3 ${theme === 'light' ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <span className={`font-semibold ${theme === 'light' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>Light Mode</span>
                 </button>
 
                 <button 
                   onClick={() => setTheme('dark')}
                   className={`flex flex-col items-center p-6 rounded-xl border-2 transition-all ${
                     theme === 'dark' 
-                    ? 'border-violet-600 bg-violet-50 dark:bg-violet-900/20' 
-                    : 'border-gray-200 dark:border-gray-700 hover:border-violet-300 dark:hover:border-gray-600'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  <Moon size={32} className={`mb-3 ${theme === 'dark' ? 'text-violet-600' : 'text-gray-500'}`} />
-                  <span className={`font-semibold ${theme === 'dark' ? 'text-violet-700 dark:text-violet-400' : 'text-gray-700 dark:text-gray-300'}`}>Dark Mode</span>
+                  <Moon size={32} className={`mb-3 ${theme === 'dark' ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>Dark Mode</span>
                 </button>
 
                 <button 
                   onClick={() => setTheme('system')}
                   className={`flex flex-col items-center p-6 rounded-xl border-2 transition-all ${
                     theme === 'system' 
-                    ? 'border-violet-600 bg-violet-50 dark:bg-violet-900/20' 
-                    : 'border-gray-200 dark:border-gray-700 hover:border-violet-300 dark:hover:border-gray-600'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  <Monitor size={32} className={`mb-3 ${theme === 'system' ? 'text-violet-600' : 'text-gray-500'}`} />
-                  <span className={`font-semibold ${theme === 'system' ? 'text-violet-700 dark:text-violet-400' : 'text-gray-700 dark:text-gray-300'}`}>System</span>
+                  <Monitor size={32} className={`mb-3 ${theme === 'system' ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <span className={`font-semibold ${theme === 'system' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>System</span>
                 </button>
               </div>
             </div>
