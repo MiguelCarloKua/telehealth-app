@@ -1,16 +1,39 @@
 "use client";
 
 import { Calendar as CalendarIcon, Clock, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { apiCall } from '@/lib/utils/api';
+
+interface Appointment {
+  _id: string;
+  doctor: { name: string; specialty: string };
+  scheduledDate: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  type: string;
+}
 
 export default function AppointmentsPage() {
-  // 5 Placeholder Appointments
-  const appointments = [
-    { id: 1, doctor: "Dr. Sarah Jenkins", specialty: "Cardiology", date: "May 28, 2026", time: "10:00 AM", status: "Upcoming", type: "Video" },
-    { id: 2, doctor: "Dr. Marcus Chen", specialty: "Dermatology", date: "June 02, 2026", time: "2:30 PM", status: "Upcoming", type: "Video" },
-    { id: 3, doctor: "Dr. Emily Santos", specialty: "General Practice", date: "June 15, 2026", time: "09:00 AM", status: "Upcoming", type: "In-Person" },
-    { id: 4, doctor: "Dr. Alan Turing", specialty: "Neurology", date: "April 10, 2026", time: "11:00 AM", status: "Completed", type: "Video" },
-    { id: 5, doctor: "Dr. Sarah Jenkins", specialty: "Cardiology", date: "Jan 05, 2026", time: "01:00 PM", status: "Completed", type: "In-Person" },
-  ];
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // In a real app, get patientId from auth context
+        const patientId = 'sample-patient-id';
+        const data = await apiCall(`/appointments?patientId=${patientId}`);
+        setAppointments(data);
+      } catch (error) {
+        console.error('Failed to fetch appointments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Simple static calendar generation for UI mockup
   const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -61,37 +84,47 @@ export default function AppointmentsPage() {
         {/* Right Column: Appointment List */}
         <div className="lg:col-span-2 space-y-4">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Your Schedule</h2>
-          {appointments.map((apt) => (
-            <div key={apt.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 flex flex-col md:flex-row md:items-center gap-4 transition-colors">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className={`px-2 py-1 text-xs font-bold rounded-md ${apt.status === 'Upcoming' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
-                    {apt.status.toUpperCase()}
-                  </span>
-                  <span className="text-sm font-medium text-gray-500 flex items-center gap-1">
-                    {apt.type === 'Video' ? <Video size={14} /> : <CalendarIcon size={14} />} {apt.type}
-                  </span>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{apt.doctor}</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-2 mt-1">
-                  <span className="font-medium text-blue-600 dark:text-blue-400">{apt.specialty}</span>
-                  <span>•</span>
-                  <Clock size={14} /> {apt.date} at {apt.time}
-                </p>
-              </div>
-              
-              {apt.status === 'Upcoming' && (
-                <div className="flex gap-2 w-full md:w-auto">
-                  <button className="flex-1 md:flex-none px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    Reschedule
-                  </button>
-                  <button className="flex-1 md:flex-none px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center gap-1">
-                    <X size={16} /> Cancel
-                  </button>
-                </div>
-              )}
+          {loading ? (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+              <p className="text-gray-500 dark:text-gray-400">Loading appointments...</p>
             </div>
-          ))}
+          ) : appointments.length > 0 ? (
+            appointments.map((apt) => (
+              <div key={apt._id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 flex flex-col md:flex-row md:items-center gap-4 transition-colors">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className={`px-2 py-1 text-xs font-bold rounded-md ${apt.status === 'scheduled' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+                      {apt.status.toUpperCase()}
+                    </span>
+                    <span className="text-sm font-medium text-gray-500 flex items-center gap-1">
+                      {apt.type === 'video' ? <Video size={14} /> : <CalendarIcon size={14} />} {apt.type === 'video' ? 'Video' : 'In-Person'}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">{apt.doctor.name}</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-2 mt-1">
+                    <span className="font-medium text-blue-600 dark:text-blue-400">{apt.doctor.specialty}</span>
+                    <span>•</span>
+                    <Clock size={14} /> {new Date(apt.scheduledDate).toLocaleDateString()} at {apt.startTime}
+                  </p>
+                </div>
+                
+                {apt.status === 'scheduled' && (
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button className="flex-1 md:flex-none px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      Reschedule
+                    </button>
+                    <button className="flex-1 md:flex-none px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center gap-1">
+                      <X size={16} /> Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+              <p className="text-gray-500 dark:text-gray-400">No appointments scheduled</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

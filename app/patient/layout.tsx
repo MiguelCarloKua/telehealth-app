@@ -1,14 +1,19 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { Menu, X, LayoutDashboard, Stethoscope, Calendar, FileText, Settings, LogOut, Bell, CheckCircle2, Pill, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation'; // <-- Added useRouter
+import { Menu, X, LayoutDashboard, Stethoscope, Calendar, FileText, Settings, LogOut, Bell, Info } from 'lucide-react';
+import { apiCall } from '@/lib/utils/api'; 
 
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [initials, setInitials] = useState('U'); // Dynamic initials
+  
   const pathname = usePathname();
+  const router = useRouter(); // <-- Initialized router
 
   const navLinks = [
     { name: 'Dashboard', href: '/patient/dashboard', icon: LayoutDashboard },
@@ -17,21 +22,79 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     { name: 'Records', href: '/patient/records', icon: FileText },
   ];
 
-  // Placeholder Notifications
-  const notifications = [
-    { id: 1, title: 'Appointment Confirmed', desc: 'Dr. Jenkins, May 28 at 10:00 AM', time: '2m ago', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
-    { id: 2, title: 'New Prescription Added', desc: 'Lisinopril 10mg added to your records.', time: '1h ago', icon: Pill, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    { id: 3, title: 'Lab Results Ready', desc: 'Your recent blood work is now available.', time: '2d ago', icon: Activity, color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30' },
-  ];
+  // --- LOGOUT LOGIC ---
+  const handleLogout = async () => {
+    try {
+      // 1. Tell the backend to destroy the secure cookies
+      await fetch('/api/auth/logout', { method: 'POST' });
+      
+      // 2. Clear frontend local storage
+      localStorage.removeItem('patientId');
+      localStorage.removeItem('patientName');
+      
+      // 3. Push to login page
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('Logout failed', error);
+    }
+  };
+
+  // --- BFCache / BACK BUTTON PROTECTION ---
+  useEffect(() => {
+    const checkAuth = () => {
+      const patientId = localStorage.getItem('patientId');
+      if (!patientId) {
+        // Use replace instead of push so they can't hit 'forward' again
+        router.replace('/auth/login'); 
+      }
+    };
+
+    // Check immediately on mount
+    checkAuth();
+
+    // Listen for the user returning to the tab or using the Back button
+    window.addEventListener('pageshow', checkAuth);
+    window.addEventListener('focus', checkAuth);
+
+    return () => {
+      window.removeEventListener('pageshow', checkAuth);
+      window.removeEventListener('focus', checkAuth);
+    };
+  }, [router]);
+  
+  // --- INITIAL LOAD & POLLING LOGIC ---
+  useEffect(() => {
+    // Set dynamic initials from local storage
+    const storedName = localStorage.getItem('patientName');
+    if (storedName) {
+      const parts = storedName.split(' ');
+      const init = parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '');
+      setInitials(init.toUpperCase());
+    }
+
+    const fetchNotifications = async () => {
+      const patientId = localStorage.getItem('patientId'); 
+      if (!patientId) return;
+
+      try {
+        const data = await apiCall(`/notifications?userId=${patientId}`);
+        setNotifications(data);
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error);
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors flex flex-col">
-      {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             
-            {/* Logo */}
             <div className="flex-shrink-0 flex items-center gap-2">
               <div className="bg-blue-600 p-2 rounded-lg text-white">
                 <Stethoscope size={24} />
@@ -39,7 +102,6 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
               <span className="text-xl font-bold text-blue-600 dark:text-blue-400 hidden sm:block">HealthApp</span>
             </div>
 
-            {/* Desktop Navigation */}
             <nav className="hidden md:flex space-x-1">
               {navLinks.map((link) => {
                 const Icon = link.icon;
@@ -60,23 +122,21 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
               })}
             </nav>
 
-            {/* Right Side Actions */}
             <div className="hidden md:flex items-center gap-4">
               
-              {/* Notification Bell & Dropdown */}
               <div className="relative">
                 <button 
                   onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                   className="relative p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
                 >
                   <Bell size={20} />
-                  {/* Notification Badge */}
-                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-800">
-                    {notifications.length}
-                  </span>
+                  {notifications.length > 0 && (
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-800">
+                      {notifications.length}
+                    </span>
+                  )}
                 </button>
 
-                {/* Dropdown Menu */}
                 {isNotificationsOpen && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50">
                     <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
@@ -84,18 +144,21 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
                       <button className="text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline">Mark all as read</button>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.map((notif) => (
-                        <div key={notif.id} className="p-4 border-b border-gray-50 dark:border-gray-750 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors cursor-pointer flex gap-3">
-                          <div className={`p-2 rounded-xl flex-shrink-0 h-10 w-10 flex items-center justify-center ${notif.bg} ${notif.color}`}>
-                            <notif.icon size={20} />
+                      {notifications.length === 0 ? (
+                         <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">No new notifications</p>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div key={notif._id} className="p-4 border-b border-gray-50 dark:border-gray-750 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors cursor-pointer flex gap-3">
+                            <div className="p-2 rounded-xl flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-500">
+                              <Info size={20} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-gray-900 dark:text-white">{notif.title}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{notif.message}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-gray-900 dark:text-white">{notif.title}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{notif.desc}</p>
-                            <p className="text-[10px] text-gray-400 mt-1 font-medium">{notif.time}</p>
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -105,19 +168,26 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
               <Link href="/patient/settings" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <Settings size={20} />
               </Link>
-              <Link href="/auth/login" className="text-red-500 hover:text-red-700">
+              
+              {/* --- FIX: Desktop Logout Button --- */}
+              <button onClick={handleLogout} className="text-red-500 hover:text-red-700 transition-colors">
                 <LogOut size={20} />
-              </Link>
+              </button>
+
+              {/* Dynamic Initials */}
               <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-400 font-bold border border-blue-200 dark:border-blue-700">
-                AL
+                {initials}
               </div>
             </div>
 
-            {/* Mobile Menu Button */}
             <div className="md:hidden flex items-center gap-4">
               <button className="relative text-gray-600 dark:text-gray-300 p-1">
                 <Bell size={24} />
-                <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-800">3</span>
+                {notifications.length > 0 && (
+                  <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-800">
+                    {notifications.length}
+                  </span>
+                )}
               </button>
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-600 dark:text-gray-300">
                 {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -126,7 +196,6 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
 
-        {/* Mobile Navigation Dropdown */}
         {isMenuOpen && (
           <div className="md:hidden bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
             <div className="px-2 pt-2 pb-3 space-y-1">
@@ -139,9 +208,14 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
                 <Link href="/patient/settings" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                   <Settings size={20} /> Settings
                 </Link>
-                <Link href="/auth/login" className="flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                
+                {/* --- FIX: Mobile Logout Button --- */}
+                <button 
+                  onClick={() => { setIsMenuOpen(false); handleLogout(); }} 
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
                   <LogOut size={20} /> Log Out
-                </Link>
+                </button>
               </div>
             </div>
           </div>

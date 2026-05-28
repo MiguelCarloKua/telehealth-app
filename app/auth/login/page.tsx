@@ -3,16 +3,55 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Stethoscope } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // CRUD: Authenticate user via API here
-    console.log("Logging in:", { email, password });
-  };
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || 'Login failed');
+        setLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+            
+            // --- FIX: Safely stitch the first and last name together ---
+            const fullName = `${data.user.firstname} ${data.user.lastname}`;
+            
+            // Save credentials for the PatientLayout route guards and Dashboard UI
+            localStorage.setItem('patientId', data.user._id);
+            localStorage.setItem('patientName', fullName);
+
+            // --- SMART ROUTING LOGIC ---
+            if (data.user.role === 'doctor') {
+              router.push('/doctor/dashboard');
+            } else {
+              const redirectPath = data.user.isOnboarded ? '/patient/dashboard' : '/patient/onboarding';
+              router.push(redirectPath);
+            }
+          } catch (err: any) {
+            setError(err.message || 'An error occurred');
+            setLoading(false);
+          }
+        };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-6 transition-colors">
@@ -30,6 +69,12 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
+          {error && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+              <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+            </div>
+          )}
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Email Address
@@ -40,7 +85,6 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="alex@example.com"
-              /* FIXED: Added text colors and dark mode background */
               className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" 
             />
           </div>
@@ -60,16 +104,16 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              /* FIXED: Added text colors and dark mode background */
               className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" 
             />
           </div>
 
           <button 
-            type="submit" 
-            className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Log In
+            {loading ? 'Logging in...' : 'Log In'}
           </button>
         </form>
         
