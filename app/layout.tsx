@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import "./globals.css"; // Ensure this points to your Tailwind v4 CSS file
+import { Providers } from "./providers";
+import "./globals.css"; 
 
 export const metadata: Metadata = {
   title: "HealthApp | Modern Telehealth",
@@ -11,10 +12,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // suppressHydrationWarning is required on the html tag for next-themes to work properly
   return (
-    <html lang="en">
-      <body className="bg-gray-50 text-gray-900 antialiased min-h-screen flex flex-col">
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased min-h-screen flex flex-col transition-colors duration-300">
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
