@@ -50,7 +50,10 @@ export default function PatientDashboard() {
         if (storedName) {
           setPatientName(storedName.split(' ')[0]);
         }
-        if (!patientId) return;
+        if (!patientId) {
+          window.location.href = '/auth/login';
+          return;
+        }
 
           // Fetch everything in parallel, including the User profile for vitals
           const [appointmentsData, prescriptionsData, notificationsData, userData] = await Promise.all([

@@ -109,21 +109,27 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!confirm("Are you absolutely sure? This will permanently delete your account and medical records. This action cannot be undone.")) return;
-    
-    const patientId = localStorage.getItem('patientId');
-    try {
-      const response = await fetch(`/api/users/${patientId}`, { method: 'DELETE' });
-      if (response.ok) {
-        localStorage.clear();
-        router.push('/auth/register');
-      } else {
-        alert("Failed to delete account. Please try again.");
+      if (!confirm("Are you absolutely sure? This will permanently delete your account and records.")) return;
+      
+      const patientId = localStorage.getItem('patientId');
+      try {
+        // 1. Delete from DB
+        const response = await fetch(`/api/users/${patientId}`, { method: 'DELETE' });
+        
+        if (response.ok) {
+          // 2. Call the logout API to clear the server-side cookies
+          await fetch('/api/auth/logout', { method: 'POST' });
+          
+          // 3. Clear frontend storage
+          localStorage.clear();
+          
+          // 4. Force a hard navigation to the root (triggers full app re-mount)
+          window.location.href = '/auth/register'; 
+        }
+      } catch (error) {
+        console.error("Deletion error:", error);
       }
-    } catch (error) {
-      console.error("Deletion error:", error);
-    }
-  };
+    };
 
   const tabs = [
     { id: 'profile', name: 'Profile Details', icon: User },
