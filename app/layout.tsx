@@ -3,7 +3,7 @@ import { Providers } from "./providers";
 import "./globals.css"; 
 
 export const metadata: Metadata = {
-  title: "HealthApp | Modern Telehealth",
+  title: "LinKod | Modern Telehealth",
   description: "Connect with doctors and manage your medical records online.",
 };
 
