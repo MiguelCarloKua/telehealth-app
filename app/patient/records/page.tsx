@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Pill, Calendar, FileText, ClipboardList, AlertCircle, Star, X } from 'lucide-react';
+import { Pill, Calendar, FileText, ClipboardList, AlertCircle, Star, X, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { apiCall } from '@/lib/utils/api';
 
@@ -264,21 +264,43 @@ export default function RecordsPage() {
                       <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusStyle(apt.status)}`}>
                         {formatStatus(apt.status)}
                       </span>
-                      {apt.status === 'completed' && (
-                        existingRating ? (
-                          <div className="flex flex-col items-start lg:items-end gap-0.5">
-                            <StarRow stars={existingRating.stars} size={13} />
-                            <span className="text-xs text-gray-400 dark:text-gray-500">Your rating</span>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => openRatingModal(apt)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold rounded-xl border border-yellow-200 dark:border-yellow-700/40 transition-colors"
-                          >
-                            <Star size={12} /> Rate Consultation
-                          </button>
-                        )
-                      )}
+                      {apt.status === 'completed' && (() => {
+                        const clinicalNote = medicalRecords.find(r => {
+                          const rApptId = typeof r.appointment === 'object' ? r.appointment?._id : r.appointment;
+                          return rApptId === apt._id;
+                        });
+                        return (
+                          <>
+                            <Link
+                              href={`/patient/consultations/${apt._id}`}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#e8eeff] dark:bg-[#0c1840] hover:bg-[#cddbfe] dark:hover:bg-[#1e3a8a]/30 text-[#2448c4] dark:text-blue-400 text-xs font-semibold rounded-xl border border-blue-100 dark:border-[#1e3a8a]/40 transition-colors"
+                            >
+                              <MessageSquare size={12} /> View Chat
+                            </Link>
+                            {clinicalNote && (
+                              <button
+                                onClick={() => setActiveTab('medical-records')}
+                                className="flex items-center gap-1.5 px-3 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full border border-green-200 dark:border-green-700/40 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                              >
+                                Clinical Note Available
+                              </button>
+                            )}
+                            {existingRating ? (
+                              <div className="flex flex-col items-start lg:items-end gap-0.5">
+                                <StarRow stars={existingRating.stars} size={13} />
+                                <span className="text-xs text-gray-400 dark:text-gray-500">Your rating</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => openRatingModal(apt)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold rounded-xl border border-yellow-200 dark:border-yellow-700/40 transition-colors"
+                              >
+                                <Star size={12} /> Rate Consultation
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 );

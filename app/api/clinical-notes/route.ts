@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import { ClinicalNote } from '@/lib/models/ClinicalNote';
-// Side-effect imports register the discriminators that populate() needs
 import '@/lib/models/User';
-import '@/lib/models/Doctor';
-import '@/lib/models/Patient';
+import { Doctor } from '@/lib/models/Doctor';
+import { Patient } from '@/lib/models/Patient';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,8 +18,8 @@ export async function GET(request: NextRequest) {
     if (appointmentId) query.appointment = appointmentId;
 
     const notes = await ClinicalNote.find(query)
-      .populate('doctor', 'firstname lastname specialty profileImage')
-      .populate('patient', 'firstname lastname email profileImage')
+      .populate({ path: 'doctor', model: Doctor, select: 'firstname lastname specialty profileImage' })
+      .populate({ path: 'patient', model: Patient, select: 'firstname lastname email profileImage' })
       .sort({ createdAt: -1 });
 
     return NextResponse.json(notes);

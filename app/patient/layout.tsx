@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LayoutDashboard, Stethoscope, Calendar, FileText, Settings, LogOut, Bell, CheckCheck, Sparkles } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Stethoscope, Calendar, FileText, Settings, LogOut, Bell, CheckCheck, Sparkles, Link2 } from 'lucide-react';
 import { apiCall } from '@/lib/utils/api';
 
 interface Notif {
@@ -40,7 +40,6 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const navLinks = [
     { name: 'Dashboard', href: '/patient/dashboard', icon: LayoutDashboard },
     { name: 'Find a Doctor', href: '/patient/doctors', icon: Stethoscope },
-    { name: 'AI Advisor', href: '/patient/ai', icon: Sparkles },
     { name: 'Appointments', href: '/patient/appointments', icon: Calendar },
     { name: 'Records', href: '/patient/records', icon: FileText },
   ];
@@ -181,10 +180,11 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
 
             {/* Logo */}
             <div className="shrink-0 flex items-center gap-2">
-              <div className="bg-[#1e3a8a] p-2 rounded-lg text-white">
-                <Stethoscope size={24} />
+              <div className="bg-[#1e3a8a] p-2 rounded-lg text-white flex items-center relative">
+                <Stethoscope size={22} />
+                <Link2 size={12} className="absolute -bottom-0.5 -right-0.5 bg-blue-400 rounded-sm p-px" />
               </div>
-              <span className="text-xl font-bold text-[#1e3a8a] dark:text-blue-300 hidden sm:block">HealthApp</span>
+              <span className="text-xl font-bold text-[#1e3a8a] dark:text-blue-300 hidden sm:block">LinKod</span>
             </div>
 
             {/* Desktop Navigation */}
@@ -336,8 +336,18 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
         {children}
       </main>
 
+      {/* AI Advisor FAB */}
+      <Link
+        href="/patient/ai"
+        title="AI Health Advisor"
+        style={{ zIndex: 200 }}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#1e3a8a] hover:bg-[#152870] text-white shadow-xl shadow-blue-500/40 flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95"
+      >
+        <Sparkles size={22} />
+      </Link>
+
       {/* Toast Stack */}
-      <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 items-end pointer-events-none">
+      <div className="fixed bottom-24 right-5 z-[100] flex flex-col gap-2 items-end pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}

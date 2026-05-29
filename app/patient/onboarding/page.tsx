@@ -29,7 +29,7 @@ export default function PatientOnboarding() {
     fetch(`/api/users/${patientId}`)
       .then(r => r.json())
       .then(data => {
-        if (data.height > 0 && data.bloodType) {
+        if (data.height > 0) {
           // Already onboarded — redirect silently without ever showing the form
           router.replace('/patient/dashboard');
         } else {
@@ -94,8 +94,8 @@ export default function PatientOnboarding() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Blood Type</label>
-              <select required value={formData.bloodType} onChange={e => setFormData({ ...formData, bloodType: e.target.value })} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Blood Type <span className="font-normal text-gray-400">(Optional)</span></label>
+              <select value={formData.bloodType} onChange={e => setFormData({ ...formData, bloodType: e.target.value })} className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select</option>
                 <option value="O+">O+</option><option value="O-">O-</option>
                 <option value="A+">A+</option><option value="A-">A-</option>

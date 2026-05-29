@@ -92,35 +92,58 @@ export default function AppointmentsPage() {
   const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
 
-  // Generated Time Slots
-  const generateTimeSlots = (date: Date, doctor: Doctor) => {
-      const dayName = DAYS_OF_WEEK[date.getDay()];
-      
-      // STRICT HOURS FIX: Read from the database schedule, or fallback to 9-5 if not yet configured
-      const schedule = (doctor.availableSlots && doctor.availableSlots.length > 0)
-        ? doctor.availableSlots.find(s => s.dayOfWeek === dayName)
-        : { startTime: '09:00', endTime: '17:00' };
-      
-      const slots: string[] = [];
-      
-      if (schedule) {
-        let curr = new Date(`2000-01-01T${schedule.startTime}:00`);
-        const end = new Date(`2000-01-01T${schedule.endTime}:00`);
+  // Returns all 30-min slots within the doctor's hours for a given date
+  const buildSlots = (date: Date, doctor: Doctor): string[] => {
+    const dayName = DAYS_OF_WEEK[date.getDay()];
+    const schedule =
+      (doctor.availableSlots ?? []).find(s => s.dayOfWeek === dayName) ??
+      { startTime: '09:00', endTime: '17:00' };
+    const slots: string[] = [];
+    let curr = new Date(`2000-01-01T${schedule.startTime}:00`);
+    const end  = new Date(`2000-01-01T${schedule.endTime}:00`);
+    while (curr < end) {
+      slots.push(curr.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+      curr.setMinutes(curr.getMinutes() + 30);
+    }
+    return slots;
+  };
 
-        while (curr < end) {
-          slots.push(curr.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
-          curr.setMinutes(curr.getMinutes() + 30);
-        }
-      }
-      
-      setAvailableTimeSlots(slots);
-      setFormData(prev => ({ ...prev, startTime: slots[0] || '' }));
-    };
-    
-  const handleDateSelect = (day: number) => {
+  const handleDateSelect = async (day: number) => {
     const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     setSelectedDate(dateObj);
-    if (selectedDoctor) generateTimeSlots(dateObj, selectedDoctor);
+    if (!selectedDoctor) return;
+
+    const allSlots = buildSlots(dateObj, selectedDoctor);
+
+    // Fetch existing appointments for this day — block times already taken by:
+    //   (a) the selected doctor with another patient, OR
+    //   (b) the patient themselves with any doctor
+    const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    const patientId = sessionStorage.getItem('patientId');
+    try {
+      const [doctorRes, patientRes] = await Promise.all([
+        fetch(`/api/appointments?doctorId=${selectedDoctor._id}`),
+        patientId ? fetch(`/api/appointments?patientId=${patientId}`) : Promise.resolve(null),
+      ]);
+
+      const doctorApts: any[] = doctorRes.ok ? await doctorRes.json() : [];
+      const patientApts: any[] = patientRes?.ok ? await patientRes.json() : [];
+
+      const onDay = (a: any) => a.status !== 'cancelled' && String(a.scheduledDate).split('T')[0] === dateStr;
+      const takenTimes = new Set([
+        ...doctorApts.filter(onDay).map(a => a.startTime),
+        ...patientApts.filter(onDay).map(a => a.startTime),
+      ]);
+
+      const freeSlots = allSlots.filter(s => !takenTimes.has(s));
+      setAvailableTimeSlots(freeSlots);
+      setFormData(prev => ({ ...prev, startTime: freeSlots[0] || '' }));
+      return;
+    } catch {}
+
+    // Fallback: show all slots if the fetch fails
+    setAvailableTimeSlots(allSlots);
+    setFormData(prev => ({ ...prev, startTime: allSlots[0] || '' }));
   };
 
   // --- BOOKING SUBMIT ---
@@ -275,9 +298,8 @@ export default function AppointmentsPage() {
                 }
 
                 // Check explicit working hours
-                const isDocAvailable = selectedDoctor?.availableSlots && selectedDoctor.availableSlots.length > 0
-                  ? selectedDoctor.availableSlots.some(s => s.dayOfWeek === dayName)
-                  : true;
+                // Unset days always fall back to 9-5 — never gray out a day just because the doctor hasn't explicitly configured it
+                const isDocAvailable = true;
 
                 const isSelectable = !isPast && isDocAvailable && !isBlocked;
                 

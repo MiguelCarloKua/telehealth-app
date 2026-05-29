@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LayoutDashboard, CalendarDays, Users, Settings, LogOut, Bell, Stethoscope, CheckCheck } from 'lucide-react';
+import { Menu, X, LayoutDashboard, CalendarDays, Users, Settings, LogOut, Bell, Stethoscope, CheckCheck, Link2 } from 'lucide-react';
 import { apiCall } from '@/lib/utils/api';
 
 interface Notif {
@@ -178,10 +178,11 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
 
             {/* Logo */}
             <div className="shrink-0 flex items-center gap-2">
-              <div className="bg-purple-700 p-2 rounded-lg text-white">
-                <Stethoscope size={24} />
+              <div className="bg-purple-700 p-2 rounded-lg text-white flex items-center relative">
+                <Stethoscope size={22} />
+                <Link2 size={12} className="absolute -bottom-0.5 -right-0.5 bg-purple-400 rounded-sm p-px" />
               </div>
-              <span className="text-xl font-bold text-purple-800 dark:text-purple-300 hidden sm:block">HealthApp Provider</span>
+              <span className="text-xl font-bold text-purple-800 dark:text-purple-300 hidden sm:block">LinKod</span>
             </div>
 
             {/* Desktop Navigation */}

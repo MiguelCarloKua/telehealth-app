@@ -35,18 +35,27 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const body = await request.json();
 
-    // 2. CONFLICT CHECK: Check if the doctor already has a non-cancelled appointment at this time/date
-    const existingApt = await Appointment.findOne({
-      doctor: body.doctor,
-      scheduledDate: body.scheduledDate,
-      startTime: body.startTime,
-      status: { $ne: 'cancelled' }
-    });
+    // CONFLICT CHECKS — date-range query avoids timezone/ms exact-match issues.
+    const aptDate  = new Date(body.scheduledDate);
+    const dayStart = new Date(aptDate.getFullYear(), aptDate.getMonth(), aptDate.getDate());
+    const dayEnd   = new Date(aptDate.getFullYear(), aptDate.getMonth(), aptDate.getDate() + 1);
+    const timeSlot = { scheduledDate: { $gte: dayStart, $lt: dayEnd }, startTime: body.startTime, status: { $ne: 'cancelled' } };
 
-    if (existingApt) {
+    // 1. Doctor already has someone else at this time
+    const doctorConflict = await Appointment.findOne({ doctor: body.doctor, ...timeSlot });
+    if (doctorConflict) {
       return NextResponse.json(
-        { error: 'This time slot is already booked. Please select another time.' }, 
-        { status: 400 }
+        { error: 'This doctor is already booked at that time. Please choose a different slot.' },
+        { status: 409 }
+      );
+    }
+
+    // 2. Patient already has an appointment at this time (with any doctor)
+    const patientConflict = await Appointment.findOne({ patient: body.patient, ...timeSlot });
+    if (patientConflict) {
+      return NextResponse.json(
+        { error: 'You already have an appointment at this time. Please choose a different slot.' },
+        { status: 409 }
       );
     }
 

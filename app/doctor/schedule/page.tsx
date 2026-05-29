@@ -11,7 +11,7 @@ export default function DoctorSchedule() {
   const [activeTab, setActiveTab] = useState<TabType>('appointments');
   const [appointments, setAppointments] = useState<any[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -22,15 +22,11 @@ export default function DoctorSchedule() {
   const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState<Date | null>(null);
   const [rescheduleTime, setRescheduleTime] = useState<string>('');
 
-  const [weeklySchedule, setWeeklySchedule] = useState([
-    { dayOfWeek: 'Monday', startTime: '09:00', endTime: '17:00' },
-    { dayOfWeek: 'Tuesday', startTime: '09:00', endTime: '17:00' },
-    { dayOfWeek: 'Wednesday', startTime: '09:00', endTime: '17:00' },
-    { dayOfWeek: 'Thursday', startTime: '09:00', endTime: '17:00' },
-    { dayOfWeek: 'Friday', startTime: '09:00', endTime: '17:00' },
-    { dayOfWeek: 'Saturday', startTime: '09:00', endTime: '17:00' },
-    { dayOfWeek: 'Sunday', startTime: '09:00', endTime: '17:00' },
-  ]);
+  const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const [daySchedule, setDaySchedule] = useState(
+    ALL_DAYS.map(day => ({ dayOfWeek: day, enabled: true, startTime: '00:00', endTime: '23:59' }))
+  );
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -47,7 +43,10 @@ export default function DoctorSchedule() {
         setAppointments(aptData || []);
         
         if (docData.availableSlots && docData.availableSlots.length > 0) {
-          setWeeklySchedule(docData.availableSlots);
+          setDaySchedule(prev => prev.map(d => {
+            const saved = docData.availableSlots.find((s: any) => s.dayOfWeek === d.dayOfWeek);
+            return saved ? { ...d, enabled: true, startTime: saved.startTime, endTime: saved.endTime } : { ...d, enabled: false };
+          }));
         }
 
         if (docData.blockedDates) {
@@ -91,7 +90,7 @@ export default function DoctorSchedule() {
       await fetch(`/api/users/${doctorId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blockedDates, availableSlots: weeklySchedule }),
+        body: JSON.stringify({ blockedDates, availableSlots: daySchedule.filter(d => d.enabled).map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime })) }),
       });
       alert('Calendar and Availability successfully synced to database!');
     } catch (err) { console.error("Failed to save schedule slots:", err); } 
@@ -119,7 +118,11 @@ export default function DoctorSchedule() {
   };
 
   const handleTimeChange = (day: string, field: 'startTime' | 'endTime', value: string) => {
-    setWeeklySchedule(prev => prev.map(s => s.dayOfWeek === day ? { ...s, [field]: value } : s));
+    setDaySchedule(prev => prev.map(s => s.dayOfWeek === day ? { ...s, [field]: value } : s));
+  };
+
+  const toggleDay = (day: string) => {
+    setDaySchedule(prev => prev.map(s => s.dayOfWeek === day ? { ...s, enabled: !s.enabled } : s));
   };
 
   // --- STRICT HOURS LOGIC: Dynamically generate slots for the Reschedule Modal ---
@@ -127,7 +130,7 @@ export default function DoctorSchedule() {
     if (!rescheduleSelectedDate) return [];
     
     const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][rescheduleSelectedDate.getDay()];
-    const schedule = weeklySchedule.find(s => s.dayOfWeek === dayName) || { startTime: '09:00', endTime: '17:00' };
+    const schedule = daySchedule.find(s => s.dayOfWeek === dayName && s.enabled) || { startTime: '00:00', endTime: '23:59' };
 
     // Find slots already booked on this day to prevent double-booking
     const bookedTimes = appointments
@@ -313,16 +316,45 @@ export default function DoctorSchedule() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* WEEKLY HOURS SETUP */}
-            <div className="lg:col-span-1 space-y-4 bg-gray-50 dark:bg-gray-900/30 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 h-fit">
-              <h4 className="font-bold text-gray-900 dark:text-white mb-2">Weekly Hours</h4>
-              {weeklySchedule.map(slot => (
-                <div key={slot.dayOfWeek} className="flex flex-col space-y-1 pb-3 border-b border-gray-200 dark:border-gray-700 last:border-0 last:pb-0">
-                  <span className="font-medium text-sm text-gray-700 dark:text-gray-300">{slot.dayOfWeek}</span>
-                  <div className="flex gap-2 items-center">
-                    <input type="time" value={slot.startTime} onChange={(e) => handleTimeChange(slot.dayOfWeek, 'startTime', e.target.value)} className="w-full p-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-900 text-gray-900 dark:text-white outline-none" />
-                    <span className="text-gray-500 text-xs">-</span>
-                    <input type="time" value={slot.endTime} onChange={(e) => handleTimeChange(slot.dayOfWeek, 'endTime', e.target.value)} className="w-full p-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-900 text-gray-900 dark:text-white outline-none" />
+            <div className="lg:col-span-1 space-y-2 bg-gray-50 dark:bg-gray-900/30 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 h-fit">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-bold text-gray-900 dark:text-white">Weekly Hours</h4>
+                <span className="text-xs text-gray-400 dark:text-gray-500">24/7 capable</span>
+              </div>
+              {daySchedule.map(slot => (
+                <div key={slot.dayOfWeek} className={`rounded-xl border transition-colors ${slot.enabled ? 'border-violet-200 dark:border-violet-800/50 bg-white dark:bg-gray-800' : 'border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900/50 opacity-60'}`}>
+                  {/* Day header with toggle */}
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <span className={`font-semibold text-sm ${slot.enabled ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                      {slot.dayOfWeek.slice(0, 3)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleDay(slot.dayOfWeek)}
+                      className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${slot.enabled ? 'bg-violet-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      aria-label={slot.enabled ? 'Disable' : 'Enable'}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${slot.enabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
                   </div>
+                  {/* Time inputs — only visible when enabled */}
+                  {slot.enabled && (
+                    <div className="flex items-center gap-1.5 px-3 pb-2.5">
+                      <input
+                        type="time"
+                        value={slot.startTime}
+                        onChange={e => handleTimeChange(slot.dayOfWeek, 'startTime', e.target.value)}
+                        className="flex-1 p-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-violet-500"
+                      />
+                      <span className="text-gray-400 text-xs shrink-0">–</span>
+                      <input
+                        type="time"
+                        value={slot.endTime}
+                        onChange={e => handleTimeChange(slot.dayOfWeek, 'endTime', e.target.value)}
+                        className="flex-1 p-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-violet-500"
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -370,10 +402,10 @@ export default function DoctorSchedule() {
                     <button type="button" onClick={() => setRescheduleDateObj(new Date(rescheduleDateObj.setMonth(rescheduleDateObj.getMonth() + 1)))} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"><ChevronRight size={16}/></button>
                   </div>
                   {renderCalendarGrid(rescheduleDateObj, (day) => {
-                    const d = new Date(rescheduleDateObj.getFullYear(), rescheduleDateObj.getMonth(), day);
-                    if (d >= today) setRescheduleSelectedDate(d);
+                    const clicked = new Date(rescheduleDateObj.getFullYear(), rescheduleDateObj.getMonth(), day);
+                    if (clicked >= today) setRescheduleSelectedDate(clicked);
                   }, (day, isPast) => {
-                     const d = new Date(rescheduleDateObj.getFullYear(), rescheduleDateObj.getMonth(), day);
+                     const _ = new Date(rescheduleDateObj.getFullYear(), rescheduleDateObj.getMonth(), day); void _;
                      const isSelected = rescheduleSelectedDate?.getFullYear() === rescheduleDateObj.getFullYear() &&
                                         rescheduleSelectedDate?.getMonth() === rescheduleDateObj.getMonth() &&
                                         rescheduleSelectedDate?.getDate() === day;

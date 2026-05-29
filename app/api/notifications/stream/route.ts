@@ -19,15 +19,17 @@ export async function GET(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       await connectDB();
+      let closed = false;
 
       const push = async () => {
+        if (closed) return;
         try {
           const notifications = await Notification.find({ user: userId, isRead: false })
             .sort({ createdAt: -1 })
             .lean();
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(notifications)}\n\n`));
+          if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(notifications)}\n\n`));
         } catch {
-          controller.enqueue(encoder.encode(`data: []\n\n`));
+          if (!closed) controller.enqueue(encoder.encode(`data: []\n\n`));
         }
       };
 
@@ -35,6 +37,7 @@ export async function GET(request: NextRequest) {
       interval = setInterval(push, 5000);
 
       request.signal.addEventListener('abort', () => {
+        closed = true;
         if (interval) clearInterval(interval);
         try { controller.close(); } catch {}
       });

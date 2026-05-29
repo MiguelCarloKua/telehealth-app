@@ -5,8 +5,8 @@ import { Search, ArrowUpDown, ChevronLeft, ChevronRight, Calendar, Sparkles, Use
 import Link from 'next/link';
 import { apiCall } from '@/lib/utils/api';
 
-// Patient is hardcoded to Caloocan City Hall area (8th Ave, South Caloocan)
-const PATIENT_LOCATION = { lat: 14.6560, lng: 120.9788, label: 'Caloocan' };
+// Fallback coords: Caloocan City Hall area
+const CALOOCAN_FALLBACK = { lat: 14.6560, lng: 120.9788 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -107,6 +107,29 @@ export default function DoctorsPage() {
   const [ratingsMap, setRatingsMap] = useState<Record<string, RatingSummary>>({});
   const [reviewsModal, setReviewsModal] = useState<Doctor | null>(null);
 
+  // Real geolocation — falls back to Caloocan if denied or unavailable
+  const [patientLoc, setPatientLoc] = useState(CALOOCAN_FALLBACK);
+  const [locLabel, setLocLabel] = useState('Caloocan (default)');
+  const [locDetecting, setLocDetecting] = useState(true);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocDetecting(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setPatientLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocLabel('Your location (detected)');
+        setLocDetecting(false);
+      },
+      () => {
+        setLocDetecting(false); // keep Caloocan fallback
+      },
+      { timeout: 8000 }
+    );
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -147,7 +170,7 @@ export default function DoctorsPage() {
   const getDistance = (doc: Doctor): number => {
     const coords = doc.location?.coordinates;
     if (!coords) return Infinity;
-    return haversineKm(PATIENT_LOCATION.lat, PATIENT_LOCATION.lng, coords.lat, coords.lng);
+    return haversineKm(patientLoc.lat, patientLoc.lng, coords.lat, coords.lng);
   };
 
   const filtered = doctors
@@ -185,18 +208,19 @@ export default function DoctorsPage() {
             Browse our network of specialists and book online.
           </p>
         </div>
-        <Link
-          href="/patient/ai"
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#1e3a8a] hover:bg-[#152870] text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
-        >
-          <Sparkles size={16} /> AI Recommendation
-        </Link>
       </div>
 
       {/* Patient location banner */}
       <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-[#0c1840] border border-blue-100 dark:border-[#1e3a8a]/40 rounded-xl text-sm text-[#1e3a8a] dark:text-blue-300">
         <MapPin size={15} className="shrink-0 text-[#2448c4] dark:text-blue-400" />
-        <span>Your location: <span className="font-semibold">Caloocan, Metro Manila</span> — showing nearby doctors sorted by distance</span>
+        {locDetecting ? (
+          <span className="flex items-center gap-1.5 text-[#2448c4] dark:text-blue-400 opacity-70">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse inline-block" />
+            Detecting your location…
+          </span>
+        ) : (
+          <span>Your location: <span className="font-semibold">{locLabel}</span> — showing nearby doctors sorted by distance</span>
+        )}
       </div>
 
       {/* Filters */}

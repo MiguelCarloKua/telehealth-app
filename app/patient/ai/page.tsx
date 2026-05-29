@@ -175,8 +175,21 @@ function AIChatInner() {
           .sort((a, b) => b.score - a.score);
         setRecommendedDoctors(scored.slice(0, 4).map(s => s.doctor));
 
-        // Load most recent conversation if available and no query param
-        if (convList.length > 0 && !initialQuery) {
+        // When ?q= is set (from "Ask AI" on a doctor card), load the most recent
+        // conversation silently and show the query as a clickable template chip —
+        // the user reviews it and sends manually rather than auto-firing.
+        if (initialQuery) {
+          if (convList.length > 0) {
+            const latest = convList[0];
+            const convRes = await fetch(`/api/ai/conversations/${latest._id}`);
+            if (convRes.ok) {
+              const convoData = await convRes.json();
+              setActiveConvId(latest._id);
+              setMessages(convoData.messages ?? []);
+            }
+          }
+          // Leave input empty — the template chip below the input will fill it on click
+        } else if (convList.length > 0) {
           const latest = convList[0];
           const convRes = await fetch(`/api/ai/conversations/${latest._id}`);
           if (convRes.ok) {
@@ -185,7 +198,7 @@ function AIChatInner() {
             setMessages(convoData.messages ?? []);
           }
         } else {
-          await startNewConversation(patientId, doctorsData, patientProfile, initialQuery);
+          await startNewConversation(patientId, doctorsData, patientProfile, '');
         }
       } catch (err) {
         setError('Failed to initialize MedAI. Please refresh and try again.');
@@ -201,12 +214,23 @@ function AIChatInner() {
   const handleNewChat = async () => {
     const patientId = sessionStorage.getItem('patientId');
     if (!patientId) return;
-    setInitializing(true);
     setMessages([]);
+    setInput('');
     setError(null);
     setActiveConvId(null);
-    await startNewConversation(patientId, doctors, profile, '');
-    setInitializing(false);
+    // Create a blank conversation record without auto-sending any message
+    try {
+      const convRes = await fetch('/api/ai/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId, title: 'New Conversation' }),
+      });
+      if (convRes.ok) {
+        const convData = await convRes.json();
+        setActiveConvId(convData._id);
+        await loadConversations(patientId);
+      }
+    } catch {}
   };
 
   const handleLoadConversation = async (convId: string) => {
@@ -377,8 +401,21 @@ function AIChatInner() {
           )}
         </div>
 
+        {/* Doctor query template chip — shown when arriving from "Ask AI" on a doctor card */}
+        {!initializing && initialQuery && !input && (
+          <div className="px-4 pb-1">
+            <p className="text-[10px] font-semibold text-[#2448c4] dark:text-blue-500 uppercase tracking-wide mb-1.5">Suggested question</p>
+            <button
+              onClick={() => setInput(initialQuery)}
+              className="w-full text-left px-4 py-3 rounded-xl bg-[#e8eeff] dark:bg-[#0c1840] border border-[#2448c4]/30 dark:border-[#1e3a8a]/60 text-sm text-[#1e3a8a] dark:text-blue-200 hover:bg-[#cddbfe] dark:hover:bg-[#1e3a8a]/30 transition-colors line-clamp-3"
+            >
+              {initialQuery}
+            </button>
+          </div>
+        )}
+
         {/* Quick suggestions */}
-        {!initializing && messages.length <= 2 && (
+        {!initializing && messages.length <= 2 && !initialQuery && (
           <div className="px-4 pb-2 flex flex-wrap gap-2">
             {['What symptoms should concern me?', 'How often should I get checked?', 'What does my BMI mean?'].map(s => (
               <button
