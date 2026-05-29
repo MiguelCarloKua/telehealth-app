@@ -53,7 +53,7 @@ export default function PatientOnboarding() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bloodType: formData.bloodType,
+          bloodType: formData.bloodType || null,
           height: Number(formData.height),
           weight: Number(formData.weight),
           allergies: formData.allergies.split(',').map(a => a.trim()).filter(Boolean),
