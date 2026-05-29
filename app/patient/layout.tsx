@@ -59,11 +59,12 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      sessionStorage.removeItem('patientId');
-      sessionStorage.removeItem('patientName');
+      sessionStorage.clear();
       window.location.href = '/auth/login';
     } catch (error) {
       console.error('Logout failed', error);
+      sessionStorage.clear();
+      window.location.href = '/auth/login';
     }
   };
 

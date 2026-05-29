@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose'; // 1. Added mongoose import
+import mongoose from 'mongoose';
 import connectDB from '@/lib/db';
 import { Prescription } from '@/lib/models/Prescription';
 
-// 2. Ensure related models are registered for .populate() to work
-import '@/lib/models/User'; 
-import '@/lib/models/Doctor';
-import '@/lib/models/Patient';
+// Doctor and Patient are Mongoose discriminators of User.
+// Importing them ensures the discriminator models are registered before
+// .populate() attempts to look them up by name ('Doctor', 'Patient').
+import '@/lib/models/User';
+import { Doctor } from '@/lib/models/Doctor';
+import { Patient } from '@/lib/models/Patient';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,25 +19,28 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
 
     let query: any = {};
-    
+
     if (patientId) {
-      // 3. THE FIX: Check if it's a valid MongoDB ID before querying
+      // Guard against non-ObjectId strings (e.g. placeholder values from UI)
       if (!mongoose.Types.ObjectId.isValid(patientId)) {
-        // If the frontend sends 'sample-patient-id', gracefully return an empty array
-        return NextResponse.json([], { status: 200 }); 
+        return NextResponse.json([], { status: 200 });
       }
       query.patient = patientId;
     }
-    
+
     if (status) query.status = status;
 
+    // Use the explicit { path, model, select } form for discriminator models.
+    // Passing `model` directly avoids ambiguity when Mongoose resolves the ref
+    // name against its internal model registry at runtime.
     const prescriptions = await Prescription.find(query)
-      .populate('doctor', 'name specialty')
-      .populate('patient', 'name email')
-      .sort({ issuedDate: -1 });
+      .populate({ path: 'doctor', model: Doctor, select: 'firstname lastname specialty profileImage' })
+      .populate({ path: 'patient', model: Patient, select: 'firstname lastname email profileImage' })
+      .sort({ createdAt: -1 });
 
     return NextResponse.json(prescriptions);
   } catch (error: any) {
+    console.error('Prescriptions GET error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -47,15 +52,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const prescription = await Prescription.create(body);
-    
-    // 4. Safer population for POST returns
+
     await prescription.populate([
-      { path: 'doctor', select: 'name specialty' },
-      { path: 'patient', select: 'name email' }
+      { path: 'doctor', model: Doctor, select: 'firstname lastname specialty' },
+      { path: 'patient', model: Patient, select: 'firstname lastname email' },
     ]);
 
     return NextResponse.json(prescription, { status: 201 });
   } catch (error: any) {
+    console.error('Prescriptions POST error:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }

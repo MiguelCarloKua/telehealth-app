@@ -5,7 +5,8 @@ const prescriptionSchema = new mongoose.Schema(
     appointment: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Appointment',
-      required: true,
+      required: false, // Optional — prescriptions can be issued outside a formal session
+      default: null,
     },
     doctor: {
       type: mongoose.Schema.Types.ObjectId,

@@ -434,10 +434,14 @@ function AIChatInner() {
           ) : (
             <div className="px-2 pb-2 space-y-0.5">
               {conversations.slice(0, 5).map(conv => (
-                <button
+                // div instead of button so the nested delete button is valid HTML
+                <div
                   key={conv._id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleLoadConversation(conv._id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl flex items-start justify-between gap-2 transition-colors group ${
+                  onKeyDown={e => e.key === 'Enter' && handleLoadConversation(conv._id)}
+                  className={`w-full cursor-pointer px-3 py-2.5 rounded-xl flex items-start justify-between gap-2 transition-colors group ${
                     conv._id === activeConvId
                       ? 'bg-[#cddbfe] dark:bg-[#1e3a8a]/40'
                       : 'hover:bg-white dark:hover:bg-[#0e1e55]'
@@ -453,7 +457,7 @@ function AIChatInner() {
                   >
                     <Trash2 size={12} />
                   </button>
-                </button>
+                </div>
               ))}
             </div>
           )}

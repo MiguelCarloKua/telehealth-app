@@ -59,11 +59,12 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      sessionStorage.removeItem('doctorId');
-      sessionStorage.removeItem('doctorName');
+      sessionStorage.clear(); // Wipe all keys so no stale data survives
       window.location.href = '/auth/login';
     } catch (error) {
       console.error('Logout failed', error);
+      sessionStorage.clear();
+      window.location.href = '/auth/login';
     }
   };
 
@@ -170,7 +171,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
           <div className="flex justify-between items-center h-16">
 
             {/* Logo */}
-            <div className="flex-shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex items-center gap-2">
               <div className="bg-purple-700 p-2 rounded-lg text-white">
                 <Stethoscope size={24} />
               </div>
@@ -238,7 +239,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
                             onClick={() => markAsRead(notif._id)}
                             className="w-full text-left p-4 border-b border-purple-50 dark:border-purple-900/20 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors flex gap-3"
                           >
-                            <div className="p-2 rounded-xl flex-shrink-0 h-9 w-9 flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400">
+                            <div className="p-2 rounded-xl shrink-0 h-9 w-9 flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400">
                               <Bell size={16} />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -327,13 +328,13 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
       </main>
 
       {/* Toast Stack */}
-      <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 items-end pointer-events-none">
+      <div className="fixed bottom-5 right-5 z-100 flex flex-col gap-2 items-end pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
             className={`${toast.exiting ? 'toast-exit' : 'toast-enter'} pointer-events-auto w-80 bg-white dark:bg-[#230d42] rounded-xl shadow-2xl border border-purple-200 dark:border-purple-800 flex gap-3 p-4`}
           >
-            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+            <div className="shrink-0 w-9 h-9 rounded-lg bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
               <Bell size={16} />
             </div>
             <div className="flex-1 min-w-0">
@@ -342,7 +343,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
             </div>
             <button
               onClick={() => dismissToast(toast.id)}
-              className="flex-shrink-0 text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 transition-colors"
+              className="shrink-0 text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 transition-colors"
             >
               <X size={14} />
             </button>

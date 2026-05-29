@@ -34,6 +34,11 @@ export default function Login() {
 
       // === THE CRITICAL FIX IS HERE ===
       // Save the credentials to local storage so the layout and settings work
+      // Always wipe any stale session from a previous login before writing new keys.
+      // Without this, logging in as a different role leaves orphaned keys
+      // (e.g. old patientId) that confuse the layout auth guards.
+      sessionStorage.clear();
+
       if (data.user.role === 'doctor') {
         sessionStorage.setItem('doctorId', data.user._id);
         sessionStorage.setItem('doctorName', `${data.user.firstname} ${data.user.lastname}`);
@@ -41,7 +46,6 @@ export default function Login() {
       } else if (data.user.role === 'patient') {
         sessionStorage.setItem('patientId', data.user._id);
         sessionStorage.setItem('patientName', `${data.user.firstname} ${data.user.lastname}`);
-        // Redirect to onboarding if the patient hasn't filled in their health profile yet
         window.location.href = data.user.isOnboarded ? '/patient/dashboard' : '/patient/onboarding';
       }
 
