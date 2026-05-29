@@ -38,6 +38,14 @@ const doctorSchema = new mongoose.Schema(
         type: String, // Specific dates the doctor is unavailable (holidays, leaves)
       }
     ],
+    location: {
+      barangay: { type: String, default: '' },
+      city: { type: String, default: 'Caloocan' },
+      coordinates: {
+        lat: { type: Number },
+        lng: { type: Number },
+      },
+    },
     patients: [
       {
         type: mongoose.Schema.Types.ObjectId,

@@ -91,10 +91,25 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
 
+    // Patient is hardcoded to Caloocan (8th Ave area) — matches the frontend constant
+    const PATIENT_LAT = 14.6560;
+    const PATIENT_LNG = 120.9788;
+
+    function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+      const R = 6371;
+      const toRad = (deg: number) => (deg * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
     const [patient, doctors] = await Promise.all([
       Patient.findById(patientId).lean(),
       Doctor.find({})
-        .select('firstname lastname specialty expertiseTags bio experience')
+        .select('firstname lastname specialty expertiseTags bio experience location')
         .lean(),
     ]);
 
@@ -106,31 +121,42 @@ export async function POST(request: NextRequest) {
     const bmiStr = bmiVal ? `${bmiVal} (${bmiCategory(Number(bmiVal))})` : 'N/A';
 
     const doctorsList = (doctors as any[])
-      .map(
-        d =>
-          `• Dr. ${d.firstname} ${d.lastname} — ${d.specialty}${
-            d.expertiseTags?.length ? ` [${d.expertiseTags.join(', ')}]` : ''
-          }`,
-      )
+      .map(d => {
+        const coords = d.location?.coordinates;
+        const dist = coords
+          ? `${haversineKm(PATIENT_LAT, PATIENT_LNG, coords.lat, coords.lng).toFixed(1)} km away`
+          : 'distance unknown';
+        const loc = d.location?.barangay
+          ? `${d.location.barangay}, ${d.location.city ?? 'Caloocan'} — ${dist}`
+          : dist;
+        return (
+          `• Dr. ${d.firstname} ${d.lastname} — ${d.specialty}` +
+          (d.expertiseTags?.length ? ` [${d.expertiseTags.join(', ')}]` : '') +
+          ` | 📍 ${loc}` +
+          (d.experience ? ` | ${d.experience} yrs exp` : '')
+        );
+      })
       .join('\n');
 
     const systemPrompt = `You are MedAI, a warm and knowledgeable health assistant for a telehealth platform. Your job is to help patients understand their health needs and find the right specialist.
 
 PATIENT HEALTH PROFILE:
+• Location: Caloocan, Metro Manila
 • Blood Type: ${p?.bloodType || 'Not recorded'}
 • Height: ${p?.height || 'N/A'} cm | Weight: ${p?.weight || 'N/A'} kg | BMI: ${bmiStr}
 • Allergies: ${p?.allergies?.length ? p.allergies.join(', ') : 'None reported'}
 • Medical Conditions: ${p?.medicalHistory?.length ? p.medicalHistory.join(', ') : 'None reported'}
 
-AVAILABLE SPECIALISTS ON THIS PLATFORM:
+AVAILABLE SPECIALISTS (with distance from patient's location in Caloocan):
 ${doctorsList || 'No doctors currently listed.'}
 
 GUIDELINES:
-1. On the FIRST message, proactively analyze the patient's health profile and recommend 2–3 relevant specialists from the list above, explaining why each is relevant to the patient's conditions or BMI.
-2. For follow-up questions about symptoms, suggest which type of specialist would help and name matching doctors when possible.
-3. Keep responses concise — 2–4 sentences per point, plain language.
-4. Be warm and reassuring. Never diagnose — always recommend professional consultation.
-5. If no matching specialist exists, say so honestly and suggest the closest option.`;
+1. When asked about a SPECIFIC doctor: give a focused assessment covering (a) how their specialty and expertise match this patient's conditions, (b) whether their distance is convenient, and (c) an honest recommendation.
+2. On general questions: proactively analyze the patient's health profile and recommend 2–3 relevant specialists from the list, prioritising both expertise match AND proximity.
+3. For symptom questions, suggest which type of specialist would help and name the closest matching doctor.
+4. Keep responses concise — 2–4 sentences per point, plain language.
+5. Be warm and reassuring. Never diagnose — always recommend professional consultation.
+6. If no matching specialist exists, say so honestly and suggest the nearest alternative.`;
 
     const groqMessages = (messages as any[]).map(m => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',

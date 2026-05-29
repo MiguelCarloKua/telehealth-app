@@ -31,6 +31,8 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const isFirstLoad = useRef(true);
   const toastCounter = useRef(0);
   const shownToastIds = useRef<Set<string>>(new Set());
+  // IDs optimistically removed from the UI before the DB write confirms
+  const dismissedIds = useRef<Set<string>>(new Set());
 
   const pathname = usePathname();
   const router = useRouter();
@@ -121,8 +123,10 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     source.onmessage = (event) => {
       try {
         const incoming: Notif[] = JSON.parse(event.data);
+        // Filter out any IDs we've already optimistically dismissed from the UI
+        const visible = incoming.filter(n => !dismissedIds.current.has(n._id));
         if (!isFirstLoad.current) {
-          const newOnes = incoming.filter((n: Notif) => !shownToastIds.current.has(n._id));
+          const newOnes = visible.filter((n: Notif) => !shownToastIds.current.has(n._id));
           if (newOnes.length > 0) {
             newOnes.forEach((n: Notif) => shownToastIds.current.add(n._id));
             setToasts(t => [
@@ -130,11 +134,11 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
               ...newOnes.map((n: Notif) => ({ id: `${n._id}-${++toastCounter.current}`, title: n.title, message: n.message, exiting: false })),
             ]);
           }
-          setNotifications(incoming);
+          setNotifications(visible);
         } else {
           isFirstLoad.current = false;
-          incoming.forEach((n: Notif) => shownToastIds.current.add(n._id));
-          setNotifications(incoming);
+          visible.forEach((n: Notif) => shownToastIds.current.add(n._id));
+          setNotifications(visible);
         }
       } catch {}
     };
@@ -145,20 +149,28 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
 
   // --- MARK SINGLE AS READ ---
   const markAsRead = async (notifId: string) => {
+    dismissedIds.current.add(notifId);
     setNotifications(prev => prev.filter(n => n._id !== notifId));
-    shownToastIds.current.delete(notifId);
     try {
       await fetch(`/api/notifications/${notifId}`, { method: 'PATCH' });
-    } catch {}
+    } catch {
+      // Rollback: let it reappear on the next SSE push
+      dismissedIds.current.delete(notifId);
+    }
   };
 
   // --- MARK ALL AS READ ---
   const markAllAsRead = async () => {
     const patientId = sessionStorage.getItem('patientId');
+    const currentIds = notifications.map(n => n._id);
+    currentIds.forEach(id => dismissedIds.current.add(id));
     setNotifications([]);
     try {
       await apiCall(`/notifications?userId=${patientId}`, { method: 'PATCH' });
-    } catch {}
+    } catch {
+      // Rollback: remove from dismissed so SSE can restore them
+      currentIds.forEach(id => dismissedIds.current.delete(id));
+    }
   };
 
   return (

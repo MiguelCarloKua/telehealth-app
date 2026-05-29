@@ -373,7 +373,7 @@ export default function AppointmentsPage() {
                     </p>
                   </div>
                   
-                  {(apt.status === 'scheduled' || apt.status === 'rescheduled' || apt.status === 'in_progress') ? (
+                  {(apt.status === 'scheduled' || apt.status === 'rescheduled' || apt.status === 'in_progress') && (
                     <div className="flex flex-col md:flex-row gap-2">
                       <Link
                         href={`/patient/consultations/${apt._id}`}
@@ -395,13 +395,6 @@ export default function AppointmentsPage() {
                         </button>
                       )}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => handleCancel(apt._id)}
-                      className="px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
-                    >
-                      Cancel Appointment
-                    </button>
                   )}
                 </div>
               ))}

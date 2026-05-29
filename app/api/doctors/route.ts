@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // FIX: Added blockedDates to the select statement so it reaches the frontend!
     const doctors = await Doctor.find(query).select(
-      'firstname lastname specialty experience bio availableSlots blockedDates profileImage'
+      'firstname lastname specialty experience bio availableSlots blockedDates profileImage location expertiseTags'
     );
 
     return NextResponse.json(doctors);

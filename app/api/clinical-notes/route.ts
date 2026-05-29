@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import { ClinicalNote } from '@/lib/models/ClinicalNote';
+// Side-effect imports register the discriminators that populate() needs
+import '@/lib/models/User';
+import '@/lib/models/Doctor';
+import '@/lib/models/Patient';
 
 export async function GET(request: NextRequest) {
   try {

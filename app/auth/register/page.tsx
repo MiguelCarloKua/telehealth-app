@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Eye, EyeOff, Check, X as XIcon } from 'lucide-react';
 
 export default function Register() {
   const [userType, setUserType] = useState<'patient' | 'doctor'>('patient');
@@ -20,7 +21,16 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+
+  const pwRules = [
+    { label: 'At least 8 characters', pass: formData.password.length >= 8 },
+    { label: 'At least one uppercase letter', pass: /[A-Z]/.test(formData.password) },
+    { label: 'At least one number', pass: /[0-9]/.test(formData.password) },
+    { label: 'At least one special character', pass: /[^A-Za-z0-9]/.test(formData.password) },
+  ];
+  const pwValid = pwRules.every(r => r.pass);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -86,6 +96,11 @@ export default function Register() {
     // STRICT VALIDATION: Must be exactly 13 characters and start with +639
     if (formData.phoneNumber.length !== 13 || !formData.phoneNumber.startsWith('+639')) {
       setError('Please enter a valid Philippine mobile number (e.g., +639123456789).');
+      return;
+    }
+
+    if (!pwValid) {
+      setError('Password does not meet all requirements.');
       return;
     }
 
@@ -247,14 +262,35 @@ export default function Register() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password <span className="text-red-500">*</span>
             </label>
-            <input
-              type="password"
-              name="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                className="w-full px-4 py-2 pr-11 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+            {formData.password.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {pwRules.map(rule => (
+                  <li key={rule.label} className={`flex items-center gap-1.5 text-xs ${rule.pass ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {rule.pass ? <Check size={12} /> : <XIcon size={12} />}
+                    {rule.label}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {userType === 'patient' ? (
