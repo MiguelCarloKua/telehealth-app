@@ -92,16 +92,27 @@ export async function PATCH(
       );
     }
 
-    // When doctor starts the session, notify the patient so the LIVE badge appears
-    if (status === 'in_progress' && appointment.patient) {
-      const patientId = (appointment.patient as any)._id ?? appointment.patient;
-      const doctorName = appointment.doctor
-        ? `Dr. ${(appointment.doctor as any).lastname ?? 'Your Doctor'}`
-        : 'Your doctor';
+    const patientId = (appointment.patient as any)?._id ?? appointment.patient;
+    const doctorName = appointment.doctor
+      ? `Dr. ${(appointment.doctor as any).lastname ?? 'Your Doctor'}`
+      : 'Your doctor';
+
+    if (status === 'in_progress' && patientId) {
+      // Alert the patient that the session has started
       await Notification.create({
         user: patientId,
         title: '🔴 Consultation is Live',
         message: `${doctorName} has started your consultation session. Join now!`,
+        type: 'appointment',
+      });
+    }
+
+    if (status === 'completed' && patientId) {
+      // Tell the patient their records are now available
+      await Notification.create({
+        user: patientId,
+        title: '✅ Consultation Complete',
+        message: `Your session with ${doctorName} has ended. Your records and any prescriptions are now available in Medical Records.`,
         type: 'appointment',
       });
     }

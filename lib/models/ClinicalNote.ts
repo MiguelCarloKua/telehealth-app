@@ -5,7 +5,8 @@ const clinicalNoteSchema = new mongoose.Schema(
     appointment: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Appointment',
-      required: true,
+      required: false, // Optional — notes can be added outside a formal consultation session
+      default: null,
     },
     doctor: {
       type: mongoose.Schema.Types.ObjectId,

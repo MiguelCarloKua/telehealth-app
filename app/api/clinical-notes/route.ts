@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
     if (appointmentId) query.appointment = appointmentId;
 
     const notes = await ClinicalNote.find(query)
-      .populate('doctor', 'name specialty')
-      .populate('patient', 'name email')
+      .populate('doctor', 'firstname lastname specialty profileImage')
+      .populate('patient', 'firstname lastname email profileImage')
       .sort({ createdAt: -1 });
 
     return NextResponse.json(notes);

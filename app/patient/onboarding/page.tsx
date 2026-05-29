@@ -17,10 +17,20 @@ export default function PatientOnboarding() {
   });
 
   useEffect(() => {
-    // Security check
-    if (!sessionStorage.getItem('patientId')) {
-      router.push('/auth/login');
+    const patientId = sessionStorage.getItem('patientId');
+    if (!patientId) {
+      router.replace('/auth/login');
+      return;
     }
+    // Skip onboarding if already completed — prevents showing it a second time
+    fetch(`/api/users/${patientId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.height > 0 && data.bloodType) {
+          router.replace('/patient/dashboard');
+        }
+      })
+      .catch(() => {});
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {

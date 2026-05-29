@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
           email: user.email,
           phoneNumber: user.phoneNumber, // <-- Add this here
           role: user.role,
-          isOnboarded: user.role === 'patient' ? !!user.height : true,
+          // height>0 AND bloodType both required — prevents re-prompting on height=0 edge case
+          isOnboarded: user.role === 'patient' ? (user.height > 0 && !!user.bloodType) : true,
           },
       },
       { status: 200 }
