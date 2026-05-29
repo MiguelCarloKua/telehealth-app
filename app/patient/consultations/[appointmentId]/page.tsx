@@ -97,7 +97,7 @@ export default function PatientConsultation({
     return () => clearInterval(interval);
   }, [appointmentId]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newMessage.trim() || !patientId || !appointment) return;
 
@@ -175,11 +175,11 @@ export default function PatientConsultation({
           </div>
 
           <div className={`px-4 py-2 rounded-lg font-semibold text-sm ${
-            isAppointmentTime()
+            appointment.status === 'in_progress'
               ? 'bg-green-100 text-green-700'
               : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
           }`}>
-            {isAppointmentTime() ? '🔴 Live' : 'Scheduled'}
+            {appointment.status === 'in_progress' ? '🔴 Live' : 'Scheduled'}
           </div>
         </div>
       </div>
@@ -221,11 +221,9 @@ export default function PatientConsultation({
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
               <Phone size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
               <p className="text-gray-500 dark:text-gray-400">
-                {isAppointmentTime()
-                  ? 'No messages yet. Start the consultation by sending a message.'
-                  : 'Consultation will start at ' +
-                    appointment.startTime +
-                    '. Messages will appear here.'}
+                {appointment.status === 'in_progress'
+                  ? 'No messages yet. Send a message to begin.'
+                  : `Waiting for the doctor to start the session. Scheduled at ${appointment.startTime}.`}
               </p>
             </div>
           ) : (
@@ -285,8 +283,8 @@ export default function PatientConsultation({
         </div>
       </div>
 
-      {/* Message Input */}
-      {isAppointmentTime() ? (
+      {/* Message Input — unlocked once the doctor starts the session */}
+      {appointment.status === 'in_progress' ? (
         <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 md:p-6">
           <div className="max-w-4xl mx-auto">
             <form onSubmit={handleSendMessage} className="flex gap-3">
@@ -311,7 +309,7 @@ export default function PatientConsultation({
         <div className="bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 md:p-6">
           <div className="max-w-4xl mx-auto text-center text-gray-600 dark:text-gray-400">
             <Clock size={20} className="mx-auto mb-2 opacity-50" />
-            <p>Messages will be available during the scheduled appointment time.</p>
+            <p>Waiting for the doctor to start the session.</p>
           </div>
         </div>
       )}

@@ -120,7 +120,7 @@ export default function PatientDashboard() {
               className="flex-1 px-5 py-3 rounded-xl border border-blue-200 dark:border-[#1e3a8a]/50 bg-white/80 dark:bg-[#060d24]/80 backdrop-blur-sm text-[#1e3a8a] dark:text-blue-100 placeholder-blue-300 dark:placeholder-blue-600 focus:outline-none focus:ring-2 focus:ring-[#2448c4] shadow-sm"
             />
             <Link
-              href={symptomQuery ? `/patient/doctors?symptom=${encodeURIComponent(symptomQuery)}` : '/patient/doctors'}
+              href={symptomQuery ? `/patient/ai?q=${encodeURIComponent(symptomQuery)}` : '/patient/ai'}
               className="bg-[#1e3a8a] hover:bg-[#152870] text-white px-7 py-3 rounded-xl font-semibold transition-colors shadow-sm whitespace-nowrap text-center"
             >
               Ask AI

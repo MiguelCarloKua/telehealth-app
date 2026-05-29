@@ -30,6 +30,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const isFirstLoad = useRef(true);
+  const toastCounter = useRef(0);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -119,21 +120,22 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     source.onmessage = (event) => {
       try {
         const incoming: Notif[] = JSON.parse(event.data);
-        setNotifications(prev => {
-          if (!isFirstLoad.current) {
+        if (!isFirstLoad.current) {
+          setNotifications(prev => {
             const prevIds = new Set(prev.map(n => n._id));
             const newOnes = incoming.filter(n => !prevIds.has(n._id));
             if (newOnes.length > 0) {
               setToasts(t => [
                 ...t,
-                ...newOnes.map(n => ({ id: `${n._id}-${Date.now()}`, title: n.title, message: n.message, exiting: false })),
+                ...newOnes.map(n => ({ id: `${n._id}-${++toastCounter.current}`, title: n.title, message: n.message, exiting: false })),
               ]);
             }
-          } else {
-            isFirstLoad.current = false;
-          }
-          return incoming;
-        });
+            return incoming;
+          });
+        } else {
+          isFirstLoad.current = false;
+          setNotifications(incoming);
+        }
       } catch {}
     };
 

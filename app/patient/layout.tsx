@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LayoutDashboard, Stethoscope, Calendar, FileText, Settings, LogOut, Bell, CheckCheck } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Stethoscope, Calendar, FileText, Settings, LogOut, Bell, CheckCheck, Sparkles } from 'lucide-react';
 import { apiCall } from '@/lib/utils/api';
 
 interface Notif {
@@ -29,6 +29,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const [initials, setInitials] = useState('U');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const isFirstLoad = useRef(true);
+  const toastCounter = useRef(0);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const navLinks = [
     { name: 'Dashboard', href: '/patient/dashboard', icon: LayoutDashboard },
     { name: 'Find a Doctor', href: '/patient/doctors', icon: Stethoscope },
+    { name: 'AI Advisor', href: '/patient/ai', icon: Sparkles },
     { name: 'Appointments', href: '/patient/appointments', icon: Calendar },
     { name: 'Records', href: '/patient/records', icon: FileText },
   ];
@@ -117,21 +119,22 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     source.onmessage = (event) => {
       try {
         const incoming: Notif[] = JSON.parse(event.data);
-        setNotifications(prev => {
-          if (!isFirstLoad.current) {
+        if (!isFirstLoad.current) {
+          setNotifications(prev => {
             const prevIds = new Set(prev.map(n => n._id));
             const newOnes = incoming.filter(n => !prevIds.has(n._id));
             if (newOnes.length > 0) {
               setToasts(t => [
                 ...t,
-                ...newOnes.map(n => ({ id: `${n._id}-${Date.now()}`, title: n.title, message: n.message, exiting: false })),
+                ...newOnes.map(n => ({ id: `${n._id}-${++toastCounter.current}`, title: n.title, message: n.message, exiting: false })),
               ]);
             }
-          } else {
-            isFirstLoad.current = false;
-          }
-          return incoming;
-        });
+            return incoming;
+          });
+        } else {
+          isFirstLoad.current = false;
+          setNotifications(incoming);
+        }
       } catch {}
     };
 

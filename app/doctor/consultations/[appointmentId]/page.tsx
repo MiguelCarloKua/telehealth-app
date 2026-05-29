@@ -131,7 +131,7 @@ export default function DoctorConsultation({
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newMessage.trim() || !doctorId || !appointment) return;
 
@@ -250,26 +250,24 @@ export default function DoctorConsultation({
             </div>
           </div>
 
-          {/* Control Buttons */}
-          {isAppointmentTime() && (
-            <div className="flex gap-3">
-              {!consultationStarted ? (
-                <button
-                  onClick={handleStartConsultation}
-                  className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Start Consultation
-                </button>
-              ) : (
-                <button
-                  onClick={handleEndConsultation}
-                  className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  End Consultation
-                </button>
-              )}
-            </div>
-          )}
+          {/* Control Buttons — always visible so the doctor can open/close the session */}
+          <div className="flex gap-3">
+            {!consultationStarted ? (
+              <button
+                onClick={handleStartConsultation}
+                className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Start Consultation
+              </button>
+            ) : (
+              <button
+                onClick={handleEndConsultation}
+                className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
+              >
+                End Consultation
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -370,11 +368,7 @@ export default function DoctorConsultation({
         <div className="bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 md:p-6">
           <div className="max-w-4xl mx-auto text-center text-gray-600 dark:text-gray-400">
             <Clock size={20} className="mx-auto mb-2 opacity-50" />
-            <p>
-              {isAppointmentTime()
-                ? 'Click "Start Consultation" to begin the session.'
-                : 'Messages will be available during the scheduled appointment time.'}
-            </p>
+            <p>Click &quot;Start Consultation&quot; above to open the session for messaging.</p>
           </div>
         </div>
       )}
