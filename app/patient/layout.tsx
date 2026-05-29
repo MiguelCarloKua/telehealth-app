@@ -31,8 +31,8 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const isFirstLoad = useRef(true);
   const toastCounter = useRef(0);
   const shownToastIds = useRef<Set<string>>(new Set());
-  // IDs optimistically removed from the UI before the DB write confirms
   const dismissedIds = useRef<Set<string>>(new Set());
+  const sessionRestoring = useRef(false);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -69,15 +69,41 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     }
   };
 
-  // --- BFCache PROTECTION ---
+  // --- BFCache PROTECTION / SESSION RESTORE ---
+  // sessionStorage is cleared when the tab closes, but HttpOnly cookies persist (7-day maxAge).
+  // Without this restore step, reopening the app causes an infinite redirect loop:
+  // middleware lets the user through (cookie present) → layout redirects to /auth/login
+  // (sessionStorage empty) → middleware redirects back to /patient/dashboard → repeat.
   useEffect(() => {
-    const checkAuth = () => {
-      if (!sessionStorage.getItem('patientId')) router.replace('/auth/login');
+    let mounted = true;
+
+    const restoreAndRedirect = async () => {
+      if (sessionRestoring.current) return;
+      sessionRestoring.current = true;
+      try {
+        const res = await fetch('/api/auth/me');
+        if (mounted && res.ok) {
+          const data = await res.json();
+          if (data.role === 'patient') {
+            sessionStorage.setItem('patientId', data._id);
+            sessionStorage.setItem('patientName', `${data.firstname} ${data.lastname}`);
+            sessionRestoring.current = false;
+            return;
+          }
+        }
+      } catch {}
+      if (mounted) router.replace('/auth/login');
     };
+
+    const checkAuth = () => {
+      if (!sessionStorage.getItem('patientId')) restoreAndRedirect();
+    };
+
     checkAuth();
     window.addEventListener('pageshow', checkAuth);
     window.addEventListener('focus', checkAuth);
     return () => {
+      mounted = false;
       window.removeEventListener('pageshow', checkAuth);
       window.removeEventListener('focus', checkAuth);
     };

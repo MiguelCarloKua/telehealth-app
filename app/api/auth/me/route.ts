@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = await User.findById(userId).select('name email role -password');
+    const user = await User.findById(userId).select('firstname lastname role');
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -22,7 +22,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(user);
+    return NextResponse.json({
+      _id: user._id.toString(),
+      firstname: user.firstname,
+      lastname: user.lastname,
+      role: user.role,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
