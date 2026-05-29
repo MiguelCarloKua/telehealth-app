@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Video, User, X, MessageSquare, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Video, User, X, MessageSquare, AlertCircle, Phone } from 'lucide-react';
 import { apiCall } from '@/lib/utils/api';
+import Link from 'next/link';
 
 interface Doctor {
   _id: string;
@@ -51,7 +52,7 @@ export default function AppointmentsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const patientId = localStorage.getItem('patientId');
+        const patientId = sessionStorage.getItem('patientId');
         if (!patientId) return;
 
         const [aptData, docData] = await Promise.all([
@@ -126,7 +127,7 @@ export default function AppointmentsPage() {
 
     setBookingLoading(true);
     setError('');
-    const patientId = localStorage.getItem('patientId');
+    const patientId = sessionStorage.getItem('patientId');
 
     const [hours, minutes] = formData.startTime.split(':');
     const finalScheduledDate = new Date(selectedDate);
@@ -369,8 +370,27 @@ export default function AppointmentsPage() {
                     </p>
                   </div>
                   
-                  {(apt.status === 'scheduled' || apt.status === 'rescheduled') && (
-                    <button onClick={() => handleCancel(apt._id)} className="px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm">
+                  {(apt.status === 'scheduled' || apt.status === 'rescheduled') ? (
+                    <div className="flex flex-col md:flex-row gap-2">
+                      <Link
+                        href={`/patient/consultations/${apt._id}`}
+                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 justify-center"
+                      >
+                        <Phone size={16} />
+                        Join Consultation
+                      </Link>
+                      <button
+                        onClick={() => handleCancel(apt._id)}
+                        className="px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
+                      >
+                        Cancel Appointment
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleCancel(apt._id)}
+                      className="px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
+                    >
                       Cancel Appointment
                     </button>
                   )}

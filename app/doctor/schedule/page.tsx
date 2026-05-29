@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Edit3, Ban, FileText, User, Clock, Check, Video, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit3, Ban, FileText, User, Clock, Check, Video, MessageSquare, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { apiCall } from '@/lib/utils/api';
 
@@ -37,7 +37,7 @@ export default function DoctorSchedule() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const doctorId = localStorage.getItem('doctorId');
+      const doctorId = sessionStorage.getItem('doctorId');
       if (!doctorId) return;
       try {
         const [aptData, docData] = await Promise.all([
@@ -86,7 +86,7 @@ export default function DoctorSchedule() {
 
   const saveBlockedDates = async () => {
     setSaving(true);
-    const doctorId = localStorage.getItem('doctorId');
+    const doctorId = sessionStorage.getItem('doctorId');
     try {
       await fetch(`/api/users/${doctorId}`, {
         method: 'PUT',
@@ -273,18 +273,24 @@ export default function DoctorSchedule() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
                   {apt.patient?.medicalHistory && (
                      <Link href={`/doctor/patients/${apt.patient._id}/records`} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:text-blue-400 font-medium rounded-xl transition-colors text-sm">
                        <FileText size={16}/> Records
                      </Link>
                   )}
                   
-                  {/* HIDE RESCHEDULE BUTTON IF CANCELLED OR COMPLETED */}
                   {(apt.status === 'scheduled' || apt.status === 'rescheduled') && (
-                    <button onClick={() => { setSelectedApt(apt); setRescheduleSelectedDate(null); setRescheduleTime(''); }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 border border-violet-200 hover:bg-violet-50 text-violet-600 dark:border-violet-900/50 dark:hover:bg-violet-900/20 dark:text-violet-400 font-medium rounded-xl transition-colors text-sm">
-                      <Edit3 size={16}/> Reschedule
-                    </button>
+                    <>
+                      <Link 
+                        href={`/doctor/consultations/${apt._id}`} 
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 dark:bg-green-900/20 dark:hover:bg-green-900/40 dark:text-green-400 font-medium rounded-xl transition-colors text-sm">
+                        <Phone size={16}/> Join Consultation
+                      </Link>
+                      <button onClick={() => { setSelectedApt(apt); setRescheduleSelectedDate(null); setRescheduleTime(''); }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 border border-violet-200 hover:bg-violet-50 text-violet-600 dark:border-violet-900/50 dark:hover:bg-violet-900/20 dark:text-violet-400 font-medium rounded-xl transition-colors text-sm">
+                        <Edit3 size={16}/> Reschedule
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

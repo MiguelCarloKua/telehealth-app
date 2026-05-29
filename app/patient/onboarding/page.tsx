@@ -18,7 +18,7 @@ export default function PatientOnboarding() {
 
   useEffect(() => {
     // Security check
-    if (!localStorage.getItem('patientId')) {
+    if (!sessionStorage.getItem('patientId')) {
       router.push('/auth/login');
     }
   }, [router]);
@@ -26,7 +26,7 @@ export default function PatientOnboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const patientId = localStorage.getItem('patientId');
+    const patientId = sessionStorage.getItem('patientId');
 
     try {
       // Format arrays

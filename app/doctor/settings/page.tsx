@@ -40,7 +40,7 @@ export default function DoctorSettings() {
   useEffect(() => {
     setMounted(true);
     const fetchUserData = async () => {
-      const doctorId = localStorage.getItem('doctorId');
+      const doctorId = sessionStorage.getItem('doctorId');
       if (!doctorId) {
         setLoading(false);
         return;
@@ -93,7 +93,7 @@ export default function DoctorSettings() {
 
   const handleSaveProfessionalProfile = async (e: React.FormEvent) => {
       e.preventDefault();
-      const doctorId = localStorage.getItem('doctorId');
+      const doctorId = sessionStorage.getItem('doctorId');
       
       // ADD THIS SAFEGUARD:
       if (!doctorId || doctorId === 'null') {
@@ -136,7 +136,7 @@ export default function DoctorSettings() {
     e.preventDefault();
     setAccountSaving(true);
     setError('');
-    const doctorId = localStorage.getItem('doctorId');
+    const doctorId = sessionStorage.getItem('doctorId');
 
     try {
       const response = await fetch(`/api/users/${doctorId}`, {
@@ -150,7 +150,7 @@ export default function DoctorSettings() {
       });
 
       if (response.ok) {
-        localStorage.setItem('doctorName', `${firstName} ${lastName}`);
+        sessionStorage.setItem('doctorName', `${firstName} ${lastName}`);
         alert('Account details updated successfully!');
       } else {
         const data = await response.json();
@@ -167,7 +167,7 @@ export default function DoctorSettings() {
     e.preventDefault();
     setPasswordError('');
     setPasswordSaving(true);
-    const doctorId = localStorage.getItem('doctorId');
+    const doctorId = sessionStorage.getItem('doctorId');
 
     try {
       const response = await fetch(`/api/users/${doctorId}`, {
@@ -194,13 +194,13 @@ export default function DoctorSettings() {
   const handleDeleteAccount = async () => {
     if (!confirm("Are you absolutely sure? This will permanently delete your doctor account and schedule.")) return;
     
-    const doctorId = localStorage.getItem('doctorId');
+    const doctorId = sessionStorage.getItem('doctorId');
     try {
       const response = await fetch(`/api/users/${doctorId}`, { method: 'DELETE' });
       
       if (response.ok) {
         await fetch('/api/auth/logout', { method: 'POST' });
-        localStorage.clear();
+        sessionStorage.clear();
         window.location.href = '/auth/register'; 
       }
     } catch (err) {

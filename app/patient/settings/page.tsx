@@ -33,7 +33,7 @@ export default function SettingsPage() {
   useEffect(() => {
     setMounted(true);
     const fetchUserData = async () => {
-      const patientId = localStorage.getItem('patientId');
+      const patientId = sessionStorage.getItem('patientId');
       if (!patientId) return;
 
       try {
@@ -79,7 +79,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     setError('');
-    const patientId = localStorage.getItem('patientId');
+    const patientId = sessionStorage.getItem('patientId');
 
     try {
       const response = await fetch(`/api/users/${patientId}`, {
@@ -95,7 +95,7 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
-        localStorage.setItem('patientName', `${firstName} ${lastName}`);
+        sessionStorage.setItem('patientName', `${firstName} ${lastName}`);
         alert('Profile updated successfully!');
       } else {
         const data = await response.json();
@@ -113,7 +113,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setPasswordError('');
     setPasswordSaving(true);
-    const patientId = localStorage.getItem('patientId');
+    const patientId = sessionStorage.getItem('patientId');
 
     try {
       const response = await fetch(`/api/users/${patientId}`, {
@@ -140,13 +140,13 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
       if (!confirm("Are you absolutely sure? This will permanently delete your account and records.")) return;
       
-      const patientId = localStorage.getItem('patientId');
+      const patientId = sessionStorage.getItem('patientId');
       try {
         const response = await fetch(`/api/users/${patientId}`, { method: 'DELETE' });
         
         if (response.ok) {
           await fetch('/api/auth/logout', { method: 'POST' });
-          localStorage.clear();
+          sessionStorage.clear();
           window.location.href = '/auth/register'; 
         }
       } catch (error) {

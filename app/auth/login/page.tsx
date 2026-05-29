@@ -35,12 +35,12 @@ export default function Login() {
       // === THE CRITICAL FIX IS HERE ===
       // Save the credentials to local storage so the layout and settings work
       if (data.user.role === 'doctor') {
-        localStorage.setItem('doctorId', data.user._id);
-        localStorage.setItem('doctorName', `${data.user.firstname} ${data.user.lastname}`);
+        sessionStorage.setItem('doctorId', data.user._id);
+        sessionStorage.setItem('doctorName', `${data.user.firstname} ${data.user.lastname}`);
         window.location.href = '/doctor/dashboard'; // Hard navigate
       } else if (data.user.role === 'patient') {
-        localStorage.setItem('patientId', data.user._id);
-        localStorage.setItem('patientName', `${data.user.firstname} ${data.user.lastname}`);
+        sessionStorage.setItem('patientId', data.user._id);
+        sessionStorage.setItem('patientName', `${data.user.firstname} ${data.user.lastname}`);
         window.location.href = '/patient/dashboard'; // Hard navigate
       }
 
