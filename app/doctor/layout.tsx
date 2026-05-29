@@ -31,6 +31,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const [imageError, setImageError] = useState(false);
   const isFirstLoad = useRef(true);
   const toastCounter = useRef(0);
+  const shownToastIds = useRef<Set<string>>(new Set());
 
   const pathname = usePathname();
   const router = useRouter();
@@ -121,19 +122,20 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
       try {
         const incoming: Notif[] = JSON.parse(event.data);
         if (!isFirstLoad.current) {
-          setNotifications(prev => {
-            const prevIds = new Set(prev.map(n => n._id));
-            const newOnes = incoming.filter(n => !prevIds.has(n._id));
-            if (newOnes.length > 0) {
-              setToasts(t => [
-                ...t,
-                ...newOnes.map(n => ({ id: `${n._id}-${++toastCounter.current}`, title: n.title, message: n.message, exiting: false })),
-              ]);
-            }
-            return incoming;
-          });
+          // Only toast for IDs never shown before (prevents duplicates across rapid SSE events)
+          const newOnes = incoming.filter(n => !shownToastIds.current.has(n._id));
+          if (newOnes.length > 0) {
+            newOnes.forEach(n => shownToastIds.current.add(n._id));
+            setToasts(t => [
+              ...t,
+              ...newOnes.map(n => ({ id: `${n._id}-${++toastCounter.current}`, title: n.title, message: n.message, exiting: false })),
+            ]);
+          }
+          setNotifications(incoming);
         } else {
           isFirstLoad.current = false;
+          // Seed the set so existing notifications never fire as toasts
+          incoming.forEach((n: Notif) => shownToastIds.current.add(n._id));
           setNotifications(incoming);
         }
       } catch {}
@@ -146,6 +148,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   // --- MARK SINGLE AS READ ---
   const markAsRead = async (notifId: string) => {
     setNotifications(prev => prev.filter(n => n._id !== notifId));
+    shownToastIds.current.delete(notifId);
     try {
       await fetch(`/api/notifications/${notifId}`, { method: 'PATCH' });
     } catch {}

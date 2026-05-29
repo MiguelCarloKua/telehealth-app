@@ -3,6 +3,7 @@ import connectDB from '@/lib/db';
 import '@/lib/models/User';
 import { Patient } from '@/lib/models/Patient';
 import { Doctor } from '@/lib/models/Doctor';
+import { AIConversation } from '@/lib/models/AIConversation';
 
 /**
  * Uses Groq's free OpenAI-compatible API (api.groq.com).
@@ -81,7 +82,7 @@ async function callGroq(
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, patientId } = await request.json();
+    const { messages, patientId, conversationId } = await request.json();
 
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
@@ -143,6 +144,24 @@ GUIDELINES:
         { error: errorCode ?? 'AI_SERVICE_ERROR' },
         { status: errorCode === 'AI_RATE_LIMITED' ? 429 : errorCode === 'AI_NOT_CONFIGURED' ? 503 : 502 },
       );
+    }
+
+    // Persist the full updated conversation
+    if (conversationId) {
+      const allMessages = [
+        ...(messages as any[]).map((m: any) => ({ role: m.role, content: m.content })),
+        { role: 'assistant', content: text },
+      ];
+      // Derive a title from the first user message if it's still the default
+      const firstUserMsg = (messages as any[]).find((m: any) => m.role === 'user');
+      const autoTitle = firstUserMsg
+        ? firstUserMsg.content.slice(0, 50) + (firstUserMsg.content.length > 50 ? '…' : '')
+        : undefined;
+      await AIConversation.findByIdAndUpdate(conversationId, {
+        messages: allMessages,
+        lastMessageAt: new Date(),
+        ...(autoTitle ? { title: autoTitle } : {}),
+      });
     }
 
     return NextResponse.json({ content: text });

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from 'react';
-import { Send, Sparkles, User, Bot, Stethoscope, Calendar, ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { Send, Sparkles, User, Bot, Stethoscope, Calendar, ChevronLeft, Loader2, AlertCircle, Plus, MessageSquare, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  timestamp?: string;
 }
 
 interface Doctor {
@@ -17,7 +18,6 @@ interface Doctor {
   specialty: string;
   expertiseTags?: string[];
   bio?: string;
-  experience?: number;
   profileImage?: string;
 }
 
@@ -29,13 +29,19 @@ interface PatientProfile {
   medicalHistory?: string[];
 }
 
+interface Conversation {
+  _id: string;
+  title: string;
+  lastMessageAt: string;
+  createdAt: string;
+}
+
 function bmiValue(h?: number, w?: number) {
   if (!h || !w) return null;
   return ((w / (h * h)) * 10000).toFixed(1);
 }
 
 function matchScore(doctor: Doctor, profile: PatientProfile): number {
-  if (!profile.medicalHistory?.length && !profile.allergies?.length) return 0;
   const conditions = [
     ...(profile.medicalHistory ?? []),
     ...(profile.allergies ?? []),
@@ -52,6 +58,15 @@ function matchScore(doctor: Doctor, profile: PatientProfile): number {
   return score;
 }
 
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 function AIChatInner() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') ?? '';
@@ -65,6 +80,8 @@ function AIChatInner() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [recommendedDoctors, setRecommendedDoctors] = useState<Doctor[]>([]);
   const [profile, setProfile] = useState<PatientProfile>({});
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () =>
@@ -72,19 +89,74 @@ function AIChatInner() {
 
   useEffect(() => { scrollToBottom(); }, [messages]);
 
+  const loadConversations = useCallback(async (patientId: string) => {
+    try {
+      const res = await fetch(`/api/ai/conversations?patientId=${patientId}`);
+      if (res.ok) setConversations(await res.json());
+    } catch {}
+  }, []);
+
+  const startNewConversation = useCallback(async (
+    patientId: string,
+    doctorsData: Doctor[],
+    patientProfile: PatientProfile,
+    query: string,
+  ) => {
+    // Create a new conversation record
+    const convRes = await fetch('/api/ai/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patientId, title: query.slice(0, 50) || 'New Conversation' }),
+    });
+    const convData = convRes.ok ? await convRes.json() : null;
+    const convId = convData?._id ?? null;
+    setActiveConvId(convId);
+
+    const initialMsg: Message = {
+      role: 'user',
+      content: query || 'Hello! Please analyze my health profile and recommend which specialists I should see and why.',
+    };
+    setMessages([initialMsg]);
+
+    const aiRes = await fetch('/api/ai/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [initialMsg], patientId, conversationId: convId }),
+    });
+
+    if (!aiRes.ok) {
+      const err = await aiRes.json().catch(() => ({}));
+      if (err.error === 'AI_NOT_CONFIGURED') {
+        setKeyMissing(true);
+        setError('GROQ_API_KEY is not set. Add it to your .env.local file to enable AI recommendations.');
+      } else {
+        setError('MedAI could not connect. Type your question below to try again.');
+      }
+      return;
+    }
+
+    const { content } = await aiRes.json();
+    const botMsg: Message = { role: 'assistant', content };
+    setMessages([initialMsg, botMsg]);
+    if (convId) await loadConversations(patientId);
+  }, [loadConversations]);
+
+  // Initial load
   useEffect(() => {
     const init = async () => {
       try {
         const patientId = sessionStorage.getItem('patientId');
         if (!patientId) { window.location.href = '/auth/login'; return; }
 
-        const [userRes, doctorsRes] = await Promise.all([
+        const [userRes, doctorsRes, convListRes] = await Promise.all([
           fetch(`/api/users/${patientId}`),
           fetch('/api/doctors'),
+          fetch(`/api/ai/conversations?patientId=${patientId}`),
         ]);
 
         const userData = userRes.ok ? await userRes.json() : {};
         const doctorsData: Doctor[] = doctorsRes.ok ? await doctorsRes.json() : [];
+        const convList: Conversation[] = convListRes.ok ? await convListRes.json() : [];
 
         const patientProfile: PatientProfile = {
           bloodType: userData.bloodType,
@@ -96,54 +168,68 @@ function AIChatInner() {
 
         setProfile(patientProfile);
         setDoctors(doctorsData);
+        setConversations(convList);
 
-        // Score and sort doctors by relevance
         const scored = doctorsData
           .map(d => ({ doctor: d, score: matchScore(d, patientProfile) }))
           .sort((a, b) => b.score - a.score);
-        setRecommendedDoctors(scored.slice(0, 5).map(s => s.doctor));
+        setRecommendedDoctors(scored.slice(0, 4).map(s => s.doctor));
 
-        // Compose initial AI prompt
-        const initialMessage = initialQuery.trim()
-          ? initialQuery.trim()
-          : 'Hello! Please analyze my health profile and recommend which specialists I should see and why.';
-
-        const firstMessage: Message = { role: 'user', content: initialMessage };
-        setMessages([firstMessage]);
-
-        const aiResponse = await fetch('/api/ai/recommend', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [firstMessage],
-            patientId,
-          }),
-        });
-
-        if (!aiResponse.ok) {
-          const err = await aiResponse.json().catch(() => ({}));
-          if (err.error === 'AI_NOT_CONFIGURED') {
-            setKeyMissing(true);
-            setError('GROQ_API_KEY is not set. Add it to your .env.local file to enable AI recommendations.');
-          } else if (err.error === 'AI_RATE_LIMITED') {
-            setError('The AI service is rate-limited right now. Please wait a moment and try again.');
-          } else {
-            setError('MedAI could not connect right now. Type your question below to try again.');
+        // Load most recent conversation if available and no query param
+        if (convList.length > 0 && !initialQuery) {
+          const latest = convList[0];
+          const convRes = await fetch(`/api/ai/conversations/${latest._id}`);
+          if (convRes.ok) {
+            const convoData = await convRes.json();
+            setActiveConvId(latest._id);
+            setMessages(convoData.messages ?? []);
           }
-          return;
+        } else {
+          await startNewConversation(patientId, doctorsData, patientProfile, initialQuery);
         }
-
-        const { content } = await aiResponse.json();
-        setMessages([firstMessage, { role: 'assistant', content }]);
       } catch (err) {
-        setError('Failed to initialize the AI assistant. Please refresh and try again.');
+        setError('Failed to initialize MedAI. Please refresh and try again.');
       } finally {
         setInitializing(false);
       }
     };
 
     init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
+
+  const handleNewChat = async () => {
+    const patientId = sessionStorage.getItem('patientId');
+    if (!patientId) return;
+    setInitializing(true);
+    setMessages([]);
+    setError(null);
+    setActiveConvId(null);
+    await startNewConversation(patientId, doctors, profile, '');
+    setInitializing(false);
+  };
+
+  const handleLoadConversation = async (convId: string) => {
+    try {
+      const res = await fetch(`/api/ai/conversations/${convId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActiveConvId(convId);
+        setMessages(data.messages ?? []);
+        setError(null);
+      }
+    } catch {}
+  };
+
+  const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`/api/ai/conversations/${convId}`, { method: 'DELETE' });
+    setConversations(prev => prev.filter(c => c._id !== convId));
+    if (activeConvId === convId) {
+      setMessages([]);
+      setActiveConvId(null);
+    }
+  };
 
   const sendMessage = async (text?: string) => {
     const msgText = (text ?? input).trim();
@@ -156,31 +242,33 @@ function AIChatInner() {
     setMessages(newHistory);
     setInput('');
     setSending(true);
-    setError(null); // clear transient errors on new attempt
+    setError(null);
 
     try {
       const res = await fetch('/api/ai/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newHistory, patientId }),
+        body: JSON.stringify({ messages: newHistory, patientId, conversationId: activeConvId }),
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        const msg =
-          err.error === 'AI_RATE_LIMITED'
-            ? "I'm currently rate-limited. Please wait a moment and try again."
-            : "I'm sorry, I couldn't respond right now. Please try again.";
+        const msg = err.error === 'AI_RATE_LIMITED'
+          ? "I'm rate-limited right now. Please wait a moment and try again."
+          : "I'm sorry, I couldn't respond. Please try again.";
         setMessages(prev => [...prev, { role: 'assistant', content: msg }]);
         return;
       }
 
       const { content } = await res.json();
       setMessages(prev => [...prev, { role: 'assistant', content }]);
+
+      // Refresh conversation list to update titles and timestamps
+      if (patientId) await loadConversations(patientId);
     } catch {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: "I'm sorry, I encountered an error. Please try sending your message again." },
+        { role: 'assistant', content: "I'm sorry, I encountered an error. Please try again." },
       ]);
     } finally {
       setSending(false);
@@ -201,19 +289,26 @@ function AIChatInner() {
 
       {/* ── Chat Column ── */}
       <div className="flex-1 flex flex-col min-w-0">
-
-        {/* Chat header */}
-        <div className="bg-[#e8eeff] dark:bg-[#0a1638] border-b border-blue-200 dark:border-[#1e3a8a]/40 px-6 py-4 flex items-center gap-3">
-          <Link href="/patient/doctors" className="text-[#2448c4] dark:text-blue-400 hover:text-[#1e3a8a] mr-1">
+        {/* Header */}
+        <div className="bg-[#e8eeff] dark:bg-[#0a1638] border-b border-blue-200 dark:border-[#1e3a8a]/40 px-6 py-3 flex items-center gap-3">
+          <Link href="/patient/doctors" className="text-[#2448c4] dark:text-blue-400 hover:text-[#1e3a8a]">
             <ChevronLeft size={20} />
           </Link>
-          <div className="w-9 h-9 rounded-xl bg-linear-to-br from-[#cddbfe] to-[#7aa0f8] dark:from-[#1e3a8a] dark:to-[#2448c4] flex items-center justify-center shadow-sm">
+          <div className="w-9 h-9 rounded-xl bg-[#cddbfe] dark:bg-[#1e3a8a] flex items-center justify-center shadow-sm shrink-0">
             <Sparkles size={18} className="text-[#1e3a8a] dark:text-white" />
           </div>
-          <div>
-            <h1 className="font-bold text-[#1e3a8a] dark:text-blue-100 leading-tight">MedAI Health Assistant</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold text-[#1e3a8a] dark:text-blue-100 leading-tight truncate">
+              {conversations.find(c => c._id === activeConvId)?.title ?? 'MedAI Health Assistant'}
+            </h1>
             <p className="text-xs text-[#2448c4] dark:text-blue-400 opacity-80">Personalized to your health profile</p>
           </div>
+          <button
+            onClick={handleNewChat}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1e3a8a] hover:bg-[#152870] text-white text-xs font-semibold rounded-lg transition-colors shrink-0"
+          >
+            <Plus size={13} /> New Chat
+          </button>
         </div>
 
         {/* Error banner */}
@@ -225,10 +320,10 @@ function AIChatInner() {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
           {initializing ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-[#cddbfe] to-[#7aa0f8] dark:from-[#1e3a8a] dark:to-[#2448c4] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-[#cddbfe] dark:bg-[#1e3a8a] flex items-center justify-center">
                 <Sparkles size={24} className="text-[#1e3a8a] dark:text-white" />
               </div>
               <div className="text-center">
@@ -237,12 +332,17 @@ function AIChatInner() {
               </div>
               <Loader2 size={20} className="text-[#2448c4] dark:text-blue-400 animate-spin" />
             </div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+              <MessageSquare size={40} className="text-blue-200 dark:text-blue-800" />
+              <p className="text-[#2448c4] dark:text-blue-400 text-sm">Start a conversation or ask a health question.</p>
+            </div>
           ) : (
             <>
               {messages.map((msg, idx) => (
                 <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {msg.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#cddbfe] to-[#7aa0f8] dark:from-[#1e3a8a] dark:to-[#2448c4] flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-8 h-8 rounded-xl bg-[#cddbfe] dark:bg-[#1e3a8a] flex items-center justify-center shrink-0 mt-0.5">
                       <Bot size={15} className="text-[#1e3a8a] dark:text-white" />
                     </div>
                   )}
@@ -260,10 +360,9 @@ function AIChatInner() {
                   )}
                 </div>
               ))}
-
               {sending && (
                 <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#cddbfe] to-[#7aa0f8] dark:from-[#1e3a8a] dark:to-[#2448c4] flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#cddbfe] dark:bg-[#1e3a8a] flex items-center justify-center shrink-0">
                     <Bot size={15} className="text-[#1e3a8a] dark:text-white" />
                   </div>
                   <div className="bg-white dark:bg-[#0e1e55] border border-blue-100 dark:border-[#1e3a8a]/40 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
@@ -281,11 +380,7 @@ function AIChatInner() {
         {/* Quick suggestions */}
         {!initializing && messages.length <= 2 && (
           <div className="px-4 pb-2 flex flex-wrap gap-2">
-            {[
-              'What symptoms should concern me?',
-              'How often should I get checked?',
-              'What does my BMI mean?',
-            ].map(s => (
+            {['What symptoms should concern me?', 'How often should I get checked?', 'What does my BMI mean?'].map(s => (
               <button
                 key={s}
                 onClick={() => sendMessage(s)}
@@ -324,79 +419,93 @@ function AIChatInner() {
         </div>
       </div>
 
-      {/* ── Doctors Sidebar ── */}
+      {/* ── Right Sidebar ── */}
       <aside className="hidden lg:flex flex-col w-72 border-l border-blue-100 dark:border-[#1e3a8a]/40 bg-[#f0f4ff] dark:bg-[#060d24] overflow-y-auto">
-        <div className="p-4 border-b border-blue-100 dark:border-[#1e3a8a]/40">
-          <h2 className="font-bold text-[#1e3a8a] dark:text-blue-100 text-sm flex items-center gap-2">
-            <Stethoscope size={14} className="text-[#2448c4] dark:text-blue-400" />
-            Recommended for You
-          </h2>
-          {(profile.medicalHistory?.length ?? 0) > 0 && (
-            <p className="text-xs text-blue-400 mt-0.5">Based on your health profile</p>
+
+        {/* Conversation History */}
+        <div className="border-b border-blue-100 dark:border-[#1e3a8a]/40">
+          <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+            <h2 className="font-bold text-[#1e3a8a] dark:text-blue-100 text-sm flex items-center gap-1.5">
+              <MessageSquare size={13} className="text-[#2448c4] dark:text-blue-400" /> Recent Chats
+            </h2>
+          </div>
+          {conversations.length === 0 ? (
+            <p className="text-xs text-blue-400 px-4 pb-3">No previous conversations.</p>
+          ) : (
+            <div className="px-2 pb-2 space-y-0.5">
+              {conversations.slice(0, 5).map(conv => (
+                <button
+                  key={conv._id}
+                  onClick={() => handleLoadConversation(conv._id)}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl flex items-start justify-between gap-2 transition-colors group ${
+                    conv._id === activeConvId
+                      ? 'bg-[#cddbfe] dark:bg-[#1e3a8a]/40'
+                      : 'hover:bg-white dark:hover:bg-[#0e1e55]'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-[#1e3a8a] dark:text-blue-100 truncate">{conv.title}</p>
+                    <p className="text-[10px] text-blue-400 mt-0.5">{timeAgo(conv.lastMessageAt)}</p>
+                  </div>
+                  <button
+                    onClick={e => handleDeleteConversation(conv._id, e)}
+                    className="shrink-0 opacity-0 group-hover:opacity-100 text-blue-300 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Patient vitals strip */}
+        {/* Vitals strip */}
         {(bmi || profile.bloodType) && (
           <div className="mx-3 mt-3 p-3 bg-white dark:bg-[#0e1e55] rounded-xl border border-blue-100 dark:border-[#1e3a8a]/30 grid grid-cols-2 gap-2 text-center text-xs">
             {bmi && (
-              <div>
-                <p className="text-blue-400">BMI</p>
-                <p className="font-bold text-[#1e3a8a] dark:text-blue-200">{bmi}</p>
-              </div>
+              <div><p className="text-blue-400">BMI</p><p className="font-bold text-[#1e3a8a] dark:text-blue-200">{bmi}</p></div>
             )}
             {profile.bloodType && (
-              <div>
-                <p className="text-blue-400">Blood</p>
-                <p className="font-bold text-red-600 dark:text-red-400">{profile.bloodType}</p>
-              </div>
+              <div><p className="text-blue-400">Blood</p><p className="font-bold text-red-600 dark:text-red-400">{profile.bloodType}</p></div>
             )}
           </div>
         )}
 
-        <div className="p-3 space-y-3 flex-1">
+        {/* Recommended Doctors */}
+        <div className="px-4 pt-3 pb-2 flex items-center">
+          <h2 className="font-bold text-[#1e3a8a] dark:text-blue-100 text-sm flex items-center gap-1.5">
+            <Stethoscope size={13} className="text-[#2448c4] dark:text-blue-400" /> Recommended
+          </h2>
+        </div>
+        <div className="px-3 pb-3 space-y-3">
           {recommendedDoctors.length === 0 ? (
-            <div className="text-center py-8">
-              <Stethoscope size={28} className="text-blue-200 dark:text-blue-800 mx-auto mb-2" />
-              <p className="text-xs text-blue-400">No doctors available yet</p>
-            </div>
+            <p className="text-xs text-blue-400">No doctors available.</p>
           ) : (
             recommendedDoctors.map(doctor => (
-              <div
-                key={doctor._id}
-                className="bg-white dark:bg-[#0e1e55] rounded-xl p-4 border border-blue-100 dark:border-[#1e3a8a]/30 hover:border-[#2448c4]/40 dark:hover:border-blue-600/40 transition-colors"
-              >
+              <div key={doctor._id} className="bg-white dark:bg-[#0e1e55] rounded-xl p-3 border border-blue-100 dark:border-[#1e3a8a]/30">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-9 h-9 rounded-full bg-[#cddbfe] dark:bg-[#1e3a8a]/50 flex items-center justify-center text-[#1e3a8a] dark:text-blue-200 font-bold text-xs shrink-0 overflow-hidden">
-                    {doctor.profileImage ? (
-                      <img src={doctor.profileImage} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      `${doctor.firstname[0]}${doctor.lastname[0]}`
-                    )}
+                    {doctor.profileImage
+                      ? <img src={doctor.profileImage} alt="" className="w-full h-full object-cover" />
+                      : `${doctor.firstname[0]}${doctor.lastname[0]}`}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-[#1e3a8a] dark:text-blue-100 text-sm truncate">
-                      Dr. {doctor.firstname} {doctor.lastname}
-                    </p>
-                    <p className="text-[#2448c4] dark:text-blue-400 text-xs">{doctor.specialty}</p>
+                    <p className="font-semibold text-[#1e3a8a] dark:text-blue-100 text-xs truncate">Dr. {doctor.firstname} {doctor.lastname}</p>
+                    <p className="text-[#2448c4] dark:text-blue-400 text-[10px]">{doctor.specialty}</p>
                   </div>
                 </div>
-                {doctor.bio && (
-                  <p className="text-xs text-blue-400 dark:text-blue-500 line-clamp-2 mb-3">{doctor.bio}</p>
-                )}
                 <Link
                   href="/patient/appointments"
-                  className="w-full flex items-center justify-center gap-1.5 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                  className="w-full flex items-center justify-center gap-1 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors"
                 >
-                  <Calendar size={12} /> Book Appointment
+                  <Calendar size={11} /> Book
                 </Link>
               </div>
             ))
           )}
-
           <Link
             href="/patient/doctors"
-            className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#e8eeff] dark:bg-[#0a1638] hover:bg-[#cddbfe] dark:hover:bg-[#1e3a8a]/30 rounded-xl text-xs font-semibold text-[#2448c4] dark:text-blue-300 border border-blue-200 dark:border-[#1e3a8a]/40 transition-colors mt-1"
+            className="flex items-center justify-center gap-1 w-full py-2 bg-[#e8eeff] dark:bg-[#0a1638] hover:bg-[#cddbfe] dark:hover:bg-[#1e3a8a]/30 rounded-xl text-xs font-semibold text-[#2448c4] dark:text-blue-300 border border-blue-100 dark:border-[#1e3a8a]/40 transition-colors"
           >
             Browse All Doctors →
           </Link>

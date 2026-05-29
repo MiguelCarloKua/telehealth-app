@@ -37,11 +37,12 @@ export default function Login() {
       if (data.user.role === 'doctor') {
         sessionStorage.setItem('doctorId', data.user._id);
         sessionStorage.setItem('doctorName', `${data.user.firstname} ${data.user.lastname}`);
-        window.location.href = '/doctor/dashboard'; // Hard navigate
+        window.location.href = '/doctor/dashboard';
       } else if (data.user.role === 'patient') {
         sessionStorage.setItem('patientId', data.user._id);
         sessionStorage.setItem('patientName', `${data.user.firstname} ${data.user.lastname}`);
-        window.location.href = '/patient/dashboard'; // Hard navigate
+        // Redirect to onboarding if the patient hasn't filled in their health profile yet
+        window.location.href = data.user.isOnboarded ? '/patient/dashboard' : '/patient/onboarding';
       }
 
     } catch (err) {

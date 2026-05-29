@@ -55,7 +55,7 @@ export default function PatientConsultation({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const patientId = typeof window !== 'undefined' ? sessionStorage.getItem('userId') : null;
+  const patientId = typeof window !== 'undefined' ? sessionStorage.getItem('patientId') : null;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,34 +66,25 @@ export default function PatientConsultation({
   }, [messages]);
 
   useEffect(() => {
-    const fetchAppointment = async () => {
+    // Poll both appointment status and messages together so the patient
+    // sees the LIVE state immediately when the doctor starts the session.
+    const fetchAll = async () => {
       try {
-        const aptData = await apiCall(`/consultations/${appointmentId}`);
+        const [aptData, msgData] = await Promise.all([
+          apiCall(`/consultations/${appointmentId}`),
+          apiCall(`/consultations/${appointmentId}/messages`),
+        ]);
         setAppointment(aptData);
-      } catch (error) {
-        console.error('Failed to fetch appointment:', error);
-      }
-    };
-
-    fetchAppointment();
-  }, [appointmentId]);
-
-  useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const msgData = await apiCall(`/consultations/${appointmentId}/messages`);
         setMessages(msgData || []);
       } catch (error) {
-        console.error('Failed to fetch messages:', error);
+        console.error('Failed to fetch consultation data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMessages();
-
-    // Poll for new messages every 2 seconds
-    const interval = setInterval(fetchMessages, 2000);
+    fetchAll();
+    const interval = setInterval(fetchAll, 3000);
     return () => clearInterval(interval);
   }, [appointmentId]);
 

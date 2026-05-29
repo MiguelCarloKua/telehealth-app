@@ -78,6 +78,9 @@ export default function AppointmentsPage() {
       }
     };
     fetchData();
+    // Poll every 5 seconds so in_progress status shows without a page refresh
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // --- CALENDAR & SLOTS LOGIC ---
@@ -191,7 +194,7 @@ export default function AppointmentsPage() {
 
   const filteredAppointments = appointments.filter(apt => {
     const aptDate = new Date(apt.scheduledDate);
-    if (activeTab === 'upcoming') return (apt.status === 'scheduled' || apt.status === 'rescheduled') && aptDate >= today;
+    if (activeTab === 'upcoming') return (apt.status === 'scheduled' || apt.status === 'rescheduled' || apt.status === 'in_progress') && aptDate >= today;
     if (activeTab === 'past') return apt.status === 'completed' || (aptDate < today && apt.status !== 'cancelled');
     if (activeTab === 'cancelled') return apt.status === 'cancelled';
     return false;
@@ -370,21 +373,27 @@ export default function AppointmentsPage() {
                     </p>
                   </div>
                   
-                  {(apt.status === 'scheduled' || apt.status === 'rescheduled') ? (
+                  {(apt.status === 'scheduled' || apt.status === 'rescheduled' || apt.status === 'in_progress') ? (
                     <div className="flex flex-col md:flex-row gap-2">
                       <Link
                         href={`/patient/consultations/${apt._id}`}
-                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors text-sm flex items-center gap-2 justify-center"
+                        className={`px-4 py-2 font-medium rounded-xl transition-colors text-sm flex items-center gap-2 justify-center ${
+                          apt.status === 'in_progress'
+                            ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
+                            : 'bg-[#1e3a8a] hover:bg-[#152870] text-white'
+                        }`}
                       >
                         <Phone size={16} />
-                        Join Consultation
+                        {apt.status === 'in_progress' ? '🔴 Join Now — LIVE' : 'Join Consultation'}
                       </Link>
-                      <button
-                        onClick={() => handleCancel(apt._id)}
-                        className="px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
-                      >
-                        Cancel Appointment
-                      </button>
+                      {apt.status !== 'in_progress' && (
+                        <button
+                          onClick={() => handleCancel(apt._id)}
+                          className="px-4 py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
+                        >
+                          Cancel Appointment
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <button
