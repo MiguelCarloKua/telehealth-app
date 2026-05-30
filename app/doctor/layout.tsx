@@ -100,7 +100,8 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
       if (!sessionStorage.getItem('doctorId')) restoreAndRedirect();
     };
 
-    checkAuth();
+    // Always validate on mount — catches stale cookies after a reseed or account deletion
+    restoreAndRedirect();
     window.addEventListener('pageshow', checkAuth);
     window.addEventListener('focus', checkAuth);
     return () => {
@@ -310,7 +311,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
             {/* Mobile Toggle */}
             <div className="md:hidden flex items-center gap-3">
               <button
-                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                onClick={() => { setIsNotificationsOpen(!isNotificationsOpen); setIsMenuOpen(false); }}
                 className="relative text-purple-600 dark:text-purple-400 p-1"
               >
                 <Bell size={24} />
@@ -320,12 +321,47 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
                   </span>
                 )}
               </button>
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-purple-700 dark:text-purple-300">
+              <button onClick={() => { setIsMenuOpen(!isMenuOpen); setIsNotificationsOpen(false); }} className="text-purple-700 dark:text-purple-300">
                 {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Notifications Panel */}
+        {isNotificationsOpen && (
+          <div className="md:hidden bg-white dark:bg-[#230d42] border-t border-purple-200 dark:border-purple-900/50">
+            <div className="p-4 border-b border-purple-100 dark:border-purple-900/40 flex justify-between items-center">
+              <h3 className="font-bold text-purple-900 dark:text-purple-100">Notifications</h3>
+              {notifications.length > 0 && (
+                <button onClick={markAllAsRead} className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 font-medium hover:underline">
+                  <CheckCheck size={13} /> Mark all read
+                </button>
+              )}
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <p className="p-6 text-sm text-purple-400 dark:text-purple-500 text-center">You're all caught up</p>
+              ) : (
+                notifications.map((notif) => (
+                  <button
+                    key={notif._id}
+                    onClick={() => { markAsRead(notif._id); setIsNotificationsOpen(false); }}
+                    className="w-full text-left p-4 border-b border-purple-50 dark:border-purple-900/20 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors flex gap-3"
+                  >
+                    <div className="p-2 rounded-xl shrink-0 h-9 w-9 flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400">
+                      <Bell size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 truncate">{notif.title}</p>
+                      <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5 line-clamp-2">{notif.message}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Mobile Menu */}
         {isMenuOpen && (

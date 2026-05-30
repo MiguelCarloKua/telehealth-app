@@ -257,9 +257,9 @@ export default function AppointmentsPage() {
           <div className={`transition-opacity duration-300 ${selectedDoctor ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">2. Select Date</label>
             <div className="flex justify-between items-center mb-4">
-              <button onClick={prevMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"><ChevronLeft size={20}/></button>
+              <button onClick={prevMonth} className="p-1 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"><ChevronLeft size={20}/></button>
               <span className="font-semibold text-gray-900 dark:text-white">{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-              <button onClick={nextMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"><ChevronRight size={20}/></button>
+              <button onClick={nextMonth} className="p-1 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"><ChevronRight size={20}/></button>
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center mb-2">

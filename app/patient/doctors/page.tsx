@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, ArrowUpDown, ChevronLeft, ChevronRight, Calendar, Sparkles, User, Star, X, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { apiCall } from '@/lib/utils/api';
@@ -42,25 +42,6 @@ interface RatingSummary {
 }
 
 const PAGE_SIZE = 9;
-
-const SPECIALTIES = [
-  'All Specialties',
-  'Cardiology',
-  'Dermatology',
-  'Endocrinology',
-  'Gastroenterology',
-  'General Practice',
-  'Neurology',
-  'Obstetrics & Gynecology',
-  'Oncology',
-  'Ophthalmology',
-  'Orthopedics',
-  'Pediatrics',
-  'Psychiatry',
-  'Pulmonology',
-  'Radiology',
-  'Urology',
-];
 
 function buildAiQuery(doctor: Doctor, distanceKm: number): string {
   const name = `Dr. ${doctor.firstname} ${doctor.lastname}`;
@@ -167,6 +148,17 @@ export default function DoctorsPage() {
   // Reset to page 1 whenever filters change
   useEffect(() => { setCurrentPage(1); }, [searchQuery, specialty, sortBy]);
 
+  // Derive specialty options from the actual doctor list with live counts
+  const specialtyOptions = useMemo(() => {
+    const counts: Record<string, number> = {};
+    doctors.forEach(doc => {
+      if (doc.specialty) counts[doc.specialty] = (counts[doc.specialty] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, count]) => ({ name, count }));
+  }, [doctors]);
+
   const getDistance = (doc: Doctor): number => {
     const coords = doc.location?.coordinates;
     if (!coords) return Infinity;
@@ -241,7 +233,10 @@ export default function DoctorsPage() {
           onChange={e => setSpecialty(e.target.value)}
           className="px-4 py-3 bg-[#f0f4ff] dark:bg-[#0c1840] border border-blue-100 dark:border-[#1e3a8a]/40 rounded-xl text-[#1e3a8a] dark:text-blue-100 focus:outline-none focus:ring-2 focus:ring-[#2448c4] text-sm cursor-pointer"
         >
-          {SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
+          <option value="All Specialties">All Specialties</option>
+          {specialtyOptions.map(({ name, count }) => (
+            <option key={name} value={name}>{name} ({count})</option>
+          ))}
         </select>
 
         <div className="relative">

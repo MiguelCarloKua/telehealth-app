@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    sessionToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
   },
   { timestamps: true, discriminatorKey: 'role' }
 );

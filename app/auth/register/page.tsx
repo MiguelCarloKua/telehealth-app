@@ -336,15 +336,30 @@ export default function Register() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Specialization <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="specialization"
                     required
                     value={formData.specialization}
                     onChange={handleChange}
-                    placeholder="e.g., Cardiology"
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  >
+                    <option value="">Select Specialization</option>
+                    <option>Cardiology</option>
+                    <option>Dermatology</option>
+                    <option>Emergency Medicine</option>
+                    <option>Endocrinology</option>
+                    <option>Family Medicine</option>
+                    <option>Gastroenterology</option>
+                    <option>General Practice</option>
+                    <option>Internal Medicine</option>
+                    <option>Neurology</option>
+                    <option>Obstetrics &amp; Gynecology</option>
+                    <option>Oncology</option>
+                    <option>Orthopedics</option>
+                    <option>Pediatrics</option>
+                    <option>Psychiatry</option>
+                    <option>Pulmonology</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -356,8 +371,12 @@ export default function Register() {
                     required
                     value={formData.licenseNumber}
                     onChange={handleChange}
+                    placeholder="MD-XXXXXX"
+                    pattern="MD-\d{6}"
+                    title="Format: MD- followed by 6 digits (e.g. MD-123456)"
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Format: MD-123456</p>
                 </div>
               </div>
             </>

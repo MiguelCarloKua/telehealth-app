@@ -48,17 +48,32 @@ export default function PatientDashboard() {
         if (storedName) setPatientName(storedName.split(' ')[0]);
         if (!patientId) { window.location.href = '/auth/login'; return; }
 
-        const [appointmentsData, prescriptionsData, notificationsData, userData] = await Promise.all([
+        const [appointmentsData, prescriptionsData, notificationsData, userRes] = await Promise.all([
           apiCall(`/appointments?patientId=${patientId}&status=scheduled`),
           apiCall(`/prescriptions?patientId=${patientId}&status=active`),
           apiCall(`/notifications?userId=${patientId}`),
-          fetch(`/api/users/${patientId}`).then(r => r.json()),
+          fetch(`/api/users/${patientId}`),
         ]);
+
+        // If the user document no longer exists (e.g. after a reseed), force a fresh login
+        if (!userRes.ok) {
+          sessionStorage.clear();
+          window.location.href = '/auth/login';
+          return;
+        }
+
+        const userData = await userRes.json();
 
         setAppointments(appointmentsData || []);
         setPrescriptions(prescriptionsData || []);
         setNotifications(notificationsData || []);
         if (userData) {
+          // Keep sessionStorage name in sync with the DB record
+          if (userData.firstname) {
+            const fullName = `${userData.firstname} ${userData.lastname}`;
+            sessionStorage.setItem('patientName', fullName);
+            setPatientName(userData.firstname);
+          }
           setVitals({
             height: userData.height || 0,
             weight: userData.weight || 0,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { Send, Sparkles, User, Bot, Stethoscope, Calendar, ChevronLeft, Loader2, AlertCircle, Plus, MessageSquare, Trash2 } from 'lucide-react';
+import { Send, Sparkles, User, Bot, Stethoscope, Calendar, ChevronLeft, Loader2, AlertCircle, Plus, MessageSquare, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -82,6 +82,7 @@ function AIChatInner() {
   const [profile, setProfile] = useState<PatientProfile>({});
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [showMobileHistory, setShowMobileHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () =>
@@ -197,9 +198,8 @@ function AIChatInner() {
             setActiveConvId(latest._id);
             setMessages(convoData.messages ?? []);
           }
-        } else {
-          await startNewConversation(patientId, doctorsData, patientProfile, '');
         }
+        // No conversations and no query — show empty state so the user can type freely
       } catch (err) {
         setError('Failed to initialize MedAI. Please refresh and try again.');
       } finally {
@@ -315,7 +315,14 @@ function AIChatInner() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="bg-[#e8eeff] dark:bg-[#0a1638] border-b border-blue-200 dark:border-[#1e3a8a]/40 px-6 py-3 flex items-center gap-3">
-          <Link href="/patient/doctors" className="text-[#2448c4] dark:text-blue-400 hover:text-[#1e3a8a]">
+          {/* Mobile: open history panel. Desktop: navigate back to doctors list. */}
+          <button
+            onClick={() => setShowMobileHistory(true)}
+            className="lg:hidden text-[#2448c4] dark:text-blue-400 hover:text-[#1e3a8a]"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <Link href="/patient/doctors" className="hidden lg:block text-[#2448c4] dark:text-blue-400 hover:text-[#1e3a8a]">
             <ChevronLeft size={20} />
           </Link>
           <div className="w-9 h-9 rounded-xl bg-[#cddbfe] dark:bg-[#1e3a8a] flex items-center justify-center shadow-sm shrink-0">
@@ -403,11 +410,11 @@ function AIChatInner() {
 
         {/* Doctor query template chip — shown when arriving from "Ask AI" on a doctor card */}
         {!initializing && initialQuery && !input && (
-          <div className="px-4 pb-1">
-            <p className="text-[10px] font-semibold text-[#2448c4] dark:text-blue-500 uppercase tracking-wide mb-1.5">Suggested question</p>
+          <div className="px-4 pb-3 pt-1">
+            <p className="text-[10px] font-semibold text-[#2448c4] dark:text-blue-500 uppercase tracking-wide mb-2">Suggested question</p>
             <button
               onClick={() => setInput(initialQuery)}
-              className="w-full text-left px-4 py-3 rounded-xl bg-[#e8eeff] dark:bg-[#0c1840] border border-[#2448c4]/30 dark:border-[#1e3a8a]/60 text-sm text-[#1e3a8a] dark:text-blue-200 hover:bg-[#cddbfe] dark:hover:bg-[#1e3a8a]/30 transition-colors line-clamp-3"
+              className="max-w-xl text-left px-4 py-3 rounded-xl bg-[#e8eeff] dark:bg-[#0c1840] border border-[#2448c4]/30 dark:border-[#1e3a8a]/60 text-sm text-[#1e3a8a] dark:text-blue-200 hover:bg-[#cddbfe] dark:hover:bg-[#1e3a8a]/30 transition-colors"
             >
               {initialQuery}
             </button>
@@ -455,6 +462,67 @@ function AIChatInner() {
           </p>
         </div>
       </div>
+
+      {/* ── Mobile Chat History Overlay ── */}
+      {showMobileHistory && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col bg-[#f0f4ff] dark:bg-[#060d24]">
+          <div className="px-4 py-4 border-b border-blue-100 dark:border-[#1e3a8a]/40 flex items-center justify-between bg-[#e8eeff] dark:bg-[#0a1638]">
+            <h2 className="font-bold text-[#1e3a8a] dark:text-blue-100 flex items-center gap-2">
+              <MessageSquare size={16} className="text-[#2448c4] dark:text-blue-400" /> Chat History
+            </h2>
+            <button onClick={() => setShowMobileHistory(false)} className="text-[#2448c4] dark:text-blue-400 p-1">
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+            {conversations.length === 0 ? (
+              <p className="text-sm text-blue-400 dark:text-blue-500 text-center py-8">No previous conversations.</p>
+            ) : (
+              conversations.map(conv => (
+                <div
+                  key={conv._id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { handleLoadConversation(conv._id); setShowMobileHistory(false); }}
+                  onKeyDown={e => e.key === 'Enter' && (handleLoadConversation(conv._id), setShowMobileHistory(false))}
+                  className={`w-full cursor-pointer px-3 py-3 rounded-xl flex items-start justify-between gap-2 transition-colors group ${
+                    conv._id === activeConvId
+                      ? 'bg-[#cddbfe] dark:bg-[#1e3a8a]/40'
+                      : 'bg-white dark:bg-[#0e1e55] hover:bg-[#cddbfe] dark:hover:bg-[#1e3a8a]/30'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[#1e3a8a] dark:text-blue-100 truncate">{conv.title}</p>
+                    <p className="text-[10px] text-blue-400 mt-0.5">{timeAgo(conv.lastMessageAt)}</p>
+                  </div>
+                  <button
+                    onClick={e => handleDeleteConversation(conv._id, e)}
+                    className="shrink-0 text-blue-300 hover:text-red-500 transition-colors p-1"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="p-4 border-t border-blue-100 dark:border-[#1e3a8a]/40 flex gap-3">
+            <button
+              onClick={() => { handleNewChat(); setShowMobileHistory(false); }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#1e3a8a] hover:bg-[#152870] text-white rounded-xl text-sm font-semibold transition-colors"
+            >
+              <Plus size={16} /> New Chat
+            </button>
+            <Link
+              href="/patient/doctors"
+              className="flex items-center justify-center gap-2 px-4 py-3 border border-blue-200 dark:border-[#1e3a8a]/40 text-[#2448c4] dark:text-blue-300 rounded-xl text-sm font-semibold hover:bg-[#e8eeff] dark:hover:bg-[#0a1638] transition-colors"
+            >
+              <ChevronLeft size={16} /> Doctors
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* ── Right Sidebar ── */}
       <aside className="hidden lg:flex flex-col w-72 border-l border-blue-100 dark:border-[#1e3a8a]/40 bg-[#f0f4ff] dark:bg-[#060d24] overflow-y-auto">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import { User } from '@/lib/models/User';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +25,11 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    
+
+    // Rotate session token — invalidates any existing session on another device
+    const sessionToken = randomUUID();
+    await User.findByIdAndUpdate(user._id, { sessionToken });
+
     const response = NextResponse.json(
       {
           user: {
@@ -49,6 +54,13 @@ export async function POST(request: NextRequest) {
     });
 
     response.cookies.set('userRole', user.role, {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    response.cookies.set('sessionToken', sessionToken, {
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,

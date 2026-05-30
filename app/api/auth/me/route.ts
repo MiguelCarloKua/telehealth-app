@@ -7,19 +7,20 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const userId = request.cookies.get('userId')?.value;
+    const cookieToken = request.cookies.get('sessionToken')?.value;
+
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const user = await User.findById(userId).select('firstname lastname role');
+    const user = await User.findById(userId).select('firstname lastname role +sessionToken');
     if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // If the stored token doesn't match the cookie, a newer login has taken over
+    if (user.sessionToken && cookieToken !== user.sessionToken) {
+      return NextResponse.json({ error: 'Session superseded by a newer login' }, { status: 401 });
     }
 
     return NextResponse.json({

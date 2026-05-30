@@ -3,7 +3,14 @@ import mongoose from 'mongoose';
 import connectDB from '@/lib/db';
 import { User } from '@/lib/models/User';
 import { Patient } from '@/lib/models/Patient';
-import { Doctor } from '@/lib/models/Doctor';  
+import { Doctor } from '@/lib/models/Doctor';
+import { Appointment } from '@/lib/models/Appointment';
+import { ClinicalNote } from '@/lib/models/ClinicalNote';
+import { Prescription } from '@/lib/models/Prescription';
+import { ConsultationMessage } from '@/lib/models/ConsultationMessage';
+import { Notification } from '@/lib/models/Notification';
+import { AIConversation } from '@/lib/models/AIConversation';
+import { Rating } from '@/lib/models/Rating';
 import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -86,16 +93,44 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
-    
-    // FIX: Await the params object
+
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid User ID' }, { status: 400 });
     }
 
+    const uid = new mongoose.Types.ObjectId(id);
+
+    // 1. Collect all appointment IDs involving this user (as patient or doctor)
+    const appointments = await Appointment.find({
+      $or: [{ patient: uid }, { doctor: uid }],
+    }).select('_id');
+    const aptIds = appointments.map(a => a._id);
+
+    // 2. Delete appointment-scoped data
+    if (aptIds.length > 0) {
+      await Promise.all([
+        ClinicalNote.deleteMany({ appointment: { $in: aptIds } }),
+        Prescription.deleteMany({ appointment: { $in: aptIds } }),
+        ConsultationMessage.deleteMany({ appointment: { $in: aptIds } }),
+        Rating.deleteMany({ appointment: { $in: aptIds } }),
+      ]);
+    }
+
+    // 3. Delete the appointments themselves
+    await Appointment.deleteMany({ $or: [{ patient: uid }, { doctor: uid }] });
+
+    // 4. Delete user-scoped data
+    await Promise.all([
+      Notification.deleteMany({ user: uid }),
+      AIConversation.deleteMany({ patient: uid }),
+    ]);
+
+    // 5. Delete the user document
     await User.findByIdAndDelete(id);
-    return NextResponse.json({ message: 'Account successfully deleted' }, { status: 200 });
+
+    return NextResponse.json({ message: 'Account and all associated data successfully deleted' }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
